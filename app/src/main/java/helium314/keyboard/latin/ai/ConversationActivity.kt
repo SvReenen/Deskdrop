@@ -618,11 +618,34 @@ private fun ConversationScreen(
                     ConversationActivity.ACTION_EXECUTE -> {
                         vm.startNewChat()
                         // Select MCP model if configured
+                        // First check cloud fallback so prefs are restored
+                        // if the local server is back up.
                         val prefs = DeviceProtectedUtils.getSharedPreferences(context)
-                        val mcpModel = prefs.getString(Settings.PREF_AI_MCP_MODEL, Defaults.PREF_AI_MCP_MODEL) ?: ""
+                        AiServiceSync.checkCloudFallback(prefs)
+                        val backupKey = "ai_cloud_fallback_backup_${Settings.PREF_AI_MCP_MODEL}"
+                        val mcpModel = if (prefs.contains(backupKey)) {
+                            prefs.getString(backupKey, "") ?: ""
+                        } else {
+                            prefs.getString(Settings.PREF_AI_MCP_MODEL, Defaults.PREF_AI_MCP_MODEL) ?: ""
+                        }
                         if (mcpModel.isNotEmpty()) {
-                            vm.allModels.firstOrNull { it.modelValue == mcpModel }?.let {
-                                vm.selectedModel = it
+                            val match = vm.allModels.firstOrNull { it.modelValue == mcpModel }
+                            if (match != null) {
+                                vm.selectedModel = match
+                            } else {
+                                // Model not in cache yet (e.g. Ollama list
+                                // not fetched); synthesize a temporary entry
+                                // so we don't fall back to the cloud default.
+                                val label = mcpModel.substringAfter(":").ifBlank { mcpModel }
+                                val prefix = mcpModel.substringBefore(":", "")
+                                val displayName = when (prefix) {
+                                    "ollama" -> "$label (ollama)"
+                                    "openai" -> "$label (custom)"
+                                    else -> label
+                                }
+                                val item = ModelItem(displayName = displayName, modelValue = mcpModel)
+                                vm.allModels.add(item)
+                                vm.selectedModel = item
                             }
                         }
                         withContext(Dispatchers.Main) {
