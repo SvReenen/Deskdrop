@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  width: 1200px;
+  height: 630px;
+  background: #0a1210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  position: relative;
+}
+body::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(26,107,90,0.25) 0%, transparent 70%);
+}
+body::after {
+  content: '';
+  position: absolute;
+  bottom: -100px;
+  left: -100px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(45,139,122,0.15) 0%, transparent 70%);
+}
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  padding: 0 80px;
+}
+.logo {
+  width: 160px;
+  height: 160px;
+  border-radius: 32px;
+  box-shadow: 0 12px 48px rgba(26,107,90,0.4);
+  flex-shrink: 0;
+}
+.text h1 {
+  font-size: 56px;
+  font-weight: 800;
+  color: #e4efe9;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+.text h1 span {
+  background: linear-gradient(135deg, #1A6B5A, #3DB89E);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text p {
+  font-size: 24px;
+  color: #7a9e8f;
+  line-height: 1.5;
+  max-width: 560px;
+}
+.badge {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 8px 20px;
+  background: rgba(26,107,90,0.15);
+  border: 1px solid rgba(26,107,90,0.3);
+  border-radius: 100px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #3DB89E;
+}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="content">
+  <img src="icon.png" class="logo" alt="Deskdrop">
+  <div class="text">
+    <h1>Your keyboard,<br><span>your AI</span></h1>
+    <p>Android keyboard with built-in AI powered by your own local server. No cloud required.</p>
+    <div class="badge">Open Source &middot; GPL-3.0</div>
+  </div>
+</div>
+</body>
+</html>
