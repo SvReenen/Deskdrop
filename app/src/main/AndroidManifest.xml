@@ -160,6 +160,8 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
 
         <receiver android:name="helium314.keyboard.latin.ai.ReminderReceiver"
                 android:exported="false" />
+        <receiver android:name="helium314.keyboard.latin.ai.UpdateChecker$UpdateActionReceiver"
+                android:exported="false" />
 
         <receiver android:name="DictionaryPackInstallBroadcastReceiver" android:exported="false">
             <intent-filter>

@@ -3,6 +3,7 @@ package helium314.keyboard.latin.ai
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -10,12 +11,13 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.utils.Log
-import org.json.JSONArray
 import java.net.HttpURLConnection
 import java.net.URL
 
 /**
  * Checks GitHub Releases for a newer version of Deskdrop and shows a notification.
+ * Users can tap "Update" to download, "Later" to be reminded tomorrow,
+ * or "Skip" to permanently ignore that version.
  */
 object UpdateChecker {
 
@@ -24,11 +26,17 @@ object UpdateChecker {
     private const val API_URL = "https://api.github.com/repos/$REPO/releases/latest"
     private const val CHANNEL_ID = "deskdrop_update"
     private const val NOTIFICATION_ID = 9001
+    private const val PREFS_NAME = "deskdrop_update"
     private const val PREF_LAST_CHECK = "update_last_check"
+    private const val PREF_SKIPPED_VERSION = "update_skipped_version"
     private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L // once per day
 
+    private const val ACTION_SKIP = "helium314.keyboard.UPDATE_SKIP"
+    private const val ACTION_LATER = "helium314.keyboard.UPDATE_LATER"
+    private const val EXTRA_VERSION = "version"
+
     fun checkInBackground(context: Context) {
-        val prefs = context.getSharedPreferences("deskdrop_update", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val lastCheck = prefs.getLong(PREF_LAST_CHECK, 0)
         if (System.currentTimeMillis() - lastCheck < CHECK_INTERVAL_MS) return
 
@@ -59,8 +67,12 @@ object UpdateChecker {
 
             val currentVersion = getCurrentVersion(context) ?: return
 
+            // Check if user skipped this version
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val skippedVersion = prefs.getString(PREF_SKIPPED_VERSION, null)
+            if (tagName == skippedVersion) return
+
             if (isNewer(tagName, currentVersion)) {
-                // Find APK download URL from assets
                 val downloadUrl = findApkUrl(obj) ?: htmlUrl
                 showNotification(context, tagName, downloadUrl)
             }
@@ -115,9 +127,29 @@ object UpdateChecker {
             nm.createNotificationChannel(channel)
         }
 
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        val pending = PendingIntent.getActivity(
-            context, 0, intent,
+        // Update: opens download link
+        val updateIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        val updatePending = PendingIntent.getActivity(
+            context, 0, updateIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Later: just dismisses the notification (will reappear tomorrow)
+        val laterIntent = Intent(context, UpdateActionReceiver::class.java).apply {
+            action = ACTION_LATER
+        }
+        val laterPending = PendingIntent.getBroadcast(
+            context, 1, laterIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Skip: saves this version so it won't be shown again
+        val skipIntent = Intent(context, UpdateActionReceiver::class.java).apply {
+            action = ACTION_SKIP
+            putExtra(EXTRA_VERSION, version)
+        }
+        val skipPending = PendingIntent.getBroadcast(
+            context, 2, skipIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -125,10 +157,27 @@ object UpdateChecker {
             .setSmallIcon(R.drawable.ic_notif_reminder)
             .setContentTitle("Deskdrop $version available")
             .setContentText("Tap to download the update")
-            .setContentIntent(pending)
+            .setContentIntent(updatePending)
             .setAutoCancel(true)
+            .addAction(0, "Later", laterPending)
+            .addAction(0, "Skip this version", skipPending)
             .build()
 
         nm.notify(NOTIFICATION_ID, notification)
+    }
+
+    class UpdateActionReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(NOTIFICATION_ID)
+
+            if (intent.action == ACTION_SKIP) {
+                val version = intent.getStringExtra(EXTRA_VERSION) ?: return
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_SKIPPED_VERSION, version)
+                    .apply()
+            }
+        }
     }
 }
