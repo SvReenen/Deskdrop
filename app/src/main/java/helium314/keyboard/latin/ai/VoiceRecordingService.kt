@@ -957,6 +957,9 @@ class VoiceRecordingService : Service() {
             return
         }
 
+        // Remove any existing overlay to prevent orphaned windows
+        removeExecuteOverlay()
+
         val prefs = DeviceProtectedUtils.getSharedPreferences(this)
 
         // Update notification
@@ -1363,6 +1366,9 @@ class VoiceRecordingService : Service() {
             stopSelf()
             return
         }
+
+        // Remove any existing overlay to prevent orphaned windows
+        removeExecuteOverlay()
 
         val prefs = DeviceProtectedUtils.getSharedPreferences(this)
         // Minimal foreground notification to keep service alive (no microphone type needed)
@@ -1780,17 +1786,22 @@ class VoiceRecordingService : Service() {
     }
 
     private fun removeExecuteOverlay() {
-        mainHandler.post {
+        val cleanup = Runnable {
             try {
                 executeOverlayView?.let {
                     val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                    wm.removeView(it)
+                    try { wm.removeView(it) } catch (_: Exception) {}
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to remove execute overlay", e)
             }
             executeOverlayView = null
             executeLifecycleOwner = null
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            cleanup.run()
+        } else {
+            mainHandler.post(cleanup)
         }
     }
 
