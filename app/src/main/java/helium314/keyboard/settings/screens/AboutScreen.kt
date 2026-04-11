@@ -119,14 +119,21 @@ fun createAboutSettings(context: Context) = listOf(
                         + ctx.getString(R.string.hidden_features_text) + "</a>")
                 val message = ctx.getString(R.string.hidden_features_message, link)
                 val dialogMessage = SpannableStringUtils.fromHtml(message)
+                val scrollView = android.widget.ScrollView(ctx)
+                val textView = TextView(ctx).apply {
+                    text = dialogMessage
+                    movementMethod = LinkMovementMethod.getInstance()
+                    val pad = (16 * ctx.resources.displayMetrics.density).toInt()
+                    setPadding(pad, pad, pad, pad)
+                }
+                scrollView.addView(textView)
                 val builder = AlertDialog.Builder(ctx)
                     .setIcon(R.drawable.ic_settings_about_hidden_features)
                     .setTitle(R.string.hidden_features_title)
-                    .setMessage(dialogMessage)
+                    .setView(scrollView)
                     .setPositiveButton(R.string.dialog_close, null)
                     .create()
                 builder.show()
-                (builder.findViewById<View>(android.R.id.message) as TextView).movementMethod = LinkMovementMethod.getInstance()
             },
             icon = R.drawable.ic_settings_about_hidden_features
         )

@@ -3,4 +3,10 @@
     <files-path
         name="gesture_data_directory"
         path="gesture_data"/>
+    <cache-path
+        name="conversation_exports"
+        path="conversation_exports"/>
+    <cache-path
+        name="camera_temp"
+        path="camera_temp"/>
 </paths>

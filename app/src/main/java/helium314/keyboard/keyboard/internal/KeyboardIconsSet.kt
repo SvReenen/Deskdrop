@@ -154,6 +154,15 @@ class KeyboardIconsSet private constructor() {
                     ToolbarKey.PAGE_START -> R.drawable.ic_page_start
                     ToolbarKey.PAGE_END -> R.drawable.ic_page_end
                     ToolbarKey.SPLIT -> R.drawable.ic_ime_switcher
+                    ToolbarKey.AI_ASSIST -> R.drawable.ic_ai_assist
+                    ToolbarKey.AI_CLIPBOARD -> R.drawable.ic_ai_clipboard
+                    ToolbarKey.AI_SLOT_1 -> R.drawable.ic_ai_slot_1
+                    ToolbarKey.AI_SLOT_2 -> R.drawable.ic_ai_slot_2
+                    ToolbarKey.AI_SLOT_3 -> R.drawable.ic_ai_slot_3
+                    ToolbarKey.AI_SLOT_4 -> R.drawable.ic_ai_slot_4
+                    ToolbarKey.AI_VOICE -> R.drawable.ic_ai_voice
+                    ToolbarKey.AI_CONVERSATION -> R.drawable.ic_ai_conversation
+                    ToolbarKey.AI_ACTIONS -> R.drawable.ic_ai_actions
                 })
             }
         } }
@@ -215,6 +224,15 @@ class KeyboardIconsSet private constructor() {
                     ToolbarKey.PAGE_START -> R.drawable.ic_page_start
                     ToolbarKey.PAGE_END -> R.drawable.ic_page_end
                     ToolbarKey.SPLIT -> R.drawable.ic_ime_switcher
+                    ToolbarKey.AI_ASSIST -> R.drawable.ic_ai_assist
+                    ToolbarKey.AI_CLIPBOARD -> R.drawable.ic_ai_clipboard
+                    ToolbarKey.AI_SLOT_1 -> R.drawable.ic_ai_slot_1
+                    ToolbarKey.AI_SLOT_2 -> R.drawable.ic_ai_slot_2
+                    ToolbarKey.AI_SLOT_3 -> R.drawable.ic_ai_slot_3
+                    ToolbarKey.AI_SLOT_4 -> R.drawable.ic_ai_slot_4
+                    ToolbarKey.AI_VOICE -> R.drawable.ic_ai_voice
+                    ToolbarKey.AI_CONVERSATION -> R.drawable.ic_ai_conversation
+                    ToolbarKey.AI_ACTIONS -> R.drawable.ic_ai_actions
                 })
             }
         } }
@@ -276,6 +294,15 @@ class KeyboardIconsSet private constructor() {
                     ToolbarKey.PAGE_START -> R.drawable.ic_page_start_rounded
                     ToolbarKey.PAGE_END -> R.drawable.ic_page_end_rounded
                     ToolbarKey.SPLIT -> R.drawable.ic_ime_switcher
+                    ToolbarKey.AI_ASSIST -> R.drawable.ic_ai_assist
+                    ToolbarKey.AI_CLIPBOARD -> R.drawable.ic_ai_clipboard
+                    ToolbarKey.AI_SLOT_1 -> R.drawable.ic_ai_slot_1
+                    ToolbarKey.AI_SLOT_2 -> R.drawable.ic_ai_slot_2
+                    ToolbarKey.AI_SLOT_3 -> R.drawable.ic_ai_slot_3
+                    ToolbarKey.AI_SLOT_4 -> R.drawable.ic_ai_slot_4
+                    ToolbarKey.AI_VOICE -> R.drawable.ic_ai_voice
+                    ToolbarKey.AI_CONVERSATION -> R.drawable.ic_ai_conversation
+                    ToolbarKey.AI_ACTIONS -> R.drawable.ic_ai_actions
                 })
             }
         } }

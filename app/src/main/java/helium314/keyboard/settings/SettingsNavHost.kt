@@ -17,6 +17,7 @@ import helium314.keyboard.latin.common.LocaleUtils.constructLocale
 import helium314.keyboard.latin.settings.SettingsSubtype.Companion.toSettingsSubtype
 import helium314.keyboard.latin.settings.getTransitionAnimationScale
 import helium314.keyboard.settings.screens.AboutScreen
+import helium314.keyboard.settings.screens.AISettingsScreen
 import helium314.keyboard.settings.screens.AdvancedSettingsScreen
 import helium314.keyboard.settings.screens.AppearanceScreen
 import helium314.keyboard.settings.screens.ColorsScreen
@@ -31,6 +32,7 @@ import helium314.keyboard.settings.screens.PreferencesScreen
 import helium314.keyboard.settings.screens.SecondaryLayoutScreen
 import helium314.keyboard.settings.screens.SubtypeScreen
 import helium314.keyboard.settings.screens.TextCorrectionScreen
+import helium314.keyboard.settings.screens.ModelWizardScreen
 import helium314.keyboard.settings.screens.ToolbarScreen
 import helium314.keyboard.settings.screens.gesturedata.GestureDataScreen
 import kotlinx.coroutines.CoroutineScope
@@ -73,12 +75,22 @@ fun SettingsNavHost(
                 onClickGestureTyping = { navController.navigate(SettingsDestination.GestureTyping) },
                 onClickDataGathering = { navController.navigate(SettingsDestination.DataGathering) },
                 onClickAdvanced = { navController.navigate(SettingsDestination.Advanced) },
+                onClickAI = { navController.navigate(SettingsDestination.AI) },
                 onClickAppearance = { navController.navigate(SettingsDestination.Appearance) },
                 onClickLanguage = { navController.navigate(SettingsDestination.Languages) },
                 onClickLayouts = { navController.navigate(SettingsDestination.Layouts) },
                 onClickDictionaries = { navController.navigate(SettingsDestination.Dictionaries) },
                 onClickBack = ::goBack,
             )
+        }
+        composable(SettingsDestination.AI) {
+            AISettingsScreen(
+                onClickBack = ::goBack,
+                onClickModelWizard = { navController.navigate(SettingsDestination.ModelWizard) }
+            )
+        }
+        composable(SettingsDestination.ModelWizard) {
+            ModelWizardScreen(onClickBack = ::goBack)
         }
         composable(SettingsDestination.About) {
             AboutScreen(onClickBack = ::goBack)
@@ -153,6 +165,7 @@ object SettingsDestination {
     const val GestureTyping = "gesture_typing"
     const val DataGathering = "data_gathering" // remove when data gathering phase is done (end of 2026 latest)
     const val DataReview = "data_review" // remove when data gathering phase is done (end of 2026 latest)
+    const val AI = "ai"
     const val Advanced = "advanced"
     const val Debug = "debug"
     const val Appearance = "appearance"
@@ -164,6 +177,7 @@ object SettingsDestination {
     const val Subtype = "subtype/"
     const val Layouts = "layouts"
     const val Dictionaries = "dictionaries"
+    const val ModelWizard = "model_wizard"
     val navTarget = MutableStateFlow(Settings)
 
     private val navScope = CoroutineScope(Dispatchers.Default)

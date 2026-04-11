@@ -1,0 +1,2422 @@
+// SPDX-License-Identifier: GPL-3.0-only
+package helium314.keyboard.settings.screens
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+
+
+import androidx.core.content.edit
+import helium314.keyboard.latin.R
+import helium314.keyboard.latin.ai.AiServiceSync
+import helium314.keyboard.latin.settings.Defaults
+import helium314.keyboard.latin.settings.Settings
+import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.latin.utils.getActivity
+import helium314.keyboard.latin.utils.prefs
+import helium314.keyboard.settings.SearchSettingsScreen
+import helium314.keyboard.settings.Setting
+import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.latin.utils.Theme
+import helium314.keyboard.settings.initPreview
+import helium314.keyboard.settings.preferences.ListPreference
+import helium314.keyboard.settings.preferences.Preference
+import helium314.keyboard.settings.preferences.SecureTextInputPreference
+import helium314.keyboard.settings.preferences.TextInputPreference
+import helium314.keyboard.latin.utils.previewDark
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private val cloudModels get() = AiServiceSync.CLOUD_MODELS
+
+@Composable
+fun AISettingsScreen(onClickBack: () -> Unit, onClickModelWizard: () -> Unit = {}) {
+    val prefs = LocalContext.current.prefs()
+    val b = (LocalContext.current.getActivity() as? SettingsActivity)?.prefChanged?.collectAsState()
+    if ((b?.value ?: 0) < 0)
+        Log.v("irrelevant", "stupid way to trigger recomposition on preference change")
+
+    val scope = rememberCoroutineScope()
+    val ollamaModels = remember { mutableStateListOf<String>() }
+    val openaiCompatModels = remember { mutableStateListOf<String>() }
+    var connectionStatus by remember { mutableStateOf<ConnectionStatus>(ConnectionStatus.Idle) }
+    var openaiCompatStatus by remember { mutableStateOf<ConnectionStatus>(ConnectionStatus.Idle) }
+
+    val ctx = LocalContext.current
+    val ollamaUrl = AiServiceSync.normalizeOllamaUrl(prefs.getString(Settings.PREF_OLLAMA_URL, Defaults.PREF_OLLAMA_URL) ?: Defaults.PREF_OLLAMA_URL)
+    val openaiCompatUrl = AiServiceSync.normalizeOllamaUrl(prefs.getString(Settings.PREF_OPENAI_COMPAT_URL, "") ?: "")
+
+    LaunchedEffect(openaiCompatUrl) {
+        if (openaiCompatUrl.isNotBlank()) {
+            openaiCompatStatus = ConnectionStatus.Connecting
+            withContext(Dispatchers.IO) {
+                try {
+                    val key = helium314.keyboard.latin.ai.SecureApiKeys.getKey(Settings.PREF_OPENAI_COMPAT_API_KEY)
+                    val models = AiServiceSync.fetchOpenAiCompatibleModels(openaiCompatUrl, key)
+                    openaiCompatModels.clear()
+                    openaiCompatModels.addAll(models)
+                    openaiCompatStatus = if (models.isNotEmpty()) ConnectionStatus.Connected(models.size)
+                    else ConnectionStatus.Failed("No models found")
+                } catch (e: Exception) {
+                    openaiCompatStatus = ConnectionStatus.Failed(e.message ?: "Unknown error")
+                }
+            }
+        }
+    }
+
+    // Auto-fetch Ollama models on screen open
+    LaunchedEffect(ollamaUrl) {
+        if (ollamaUrl.isNotBlank() && ollamaUrl != "http://localhost:11434") {
+            connectionStatus = ConnectionStatus.Connecting
+            withContext(Dispatchers.IO) {
+                try {
+                    val models = AiServiceSync.fetchOllamaModels(ollamaUrl)
+                    ollamaModels.clear()
+                    ollamaModels.addAll(models)
+                    connectionStatus = if (models.isNotEmpty()) ConnectionStatus.Connected(models.size)
+                    else ConnectionStatus.Failed("No models found")
+                } catch (e: Exception) {
+                    connectionStatus = ConnectionStatus.Failed(e.message ?: "Unknown error")
+                }
+            }
+        }
+    }
+
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("General", "Local", "Cloud", "Voice")
+    val teal = brandTeal()
+
+    SearchSettingsScreen(
+        onClickBack = onClickBack,
+        title = stringResource(R.string.settings_screen_ai),
+        settings = emptyList(),
+        content = {
+            Column(Modifier.imePadding()) {
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = teal,
+                    indicator = { tabPositions ->
+                        if (selectedTab < tabPositions.size) {
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                color = teal
+                            )
+                        }
+                    }
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = {
+                                Text(
+                                    title,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            },
+                            selectedContentColor = teal,
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                when (selectedTab) {
+                    0 -> GeneralTab(prefs, ollamaModels, openaiCompatModels)
+                    1 -> LocalTab(
+                        prefs, ollamaModels, openaiCompatModels,
+                        connectionStatus, openaiCompatStatus, scope, onClickModelWizard,
+                        onConnectionStatusChange = { connectionStatus = it },
+                        onOpenAiCompatStatusChange = { openaiCompatStatus = it }
+                    )
+                    2 -> CloudTab(prefs, ollamaModels)
+                    3 -> VoiceTab(prefs, ollamaModels, openaiCompatModels)
+                }
+            }
+        }
+    )
+}
+
+// =============================================================================
+// Editable field helpers (clear "tap to type" affordance)
+// =============================================================================
+
+@Composable
+private fun EditablePrefField(
+    prefs: android.content.SharedPreferences,
+    prefKey: String,
+    label: String,
+    placeholder: String = "Tap to enter…",
+    dialogDescription: String? = null,
+    keyboardType: androidx.compose.ui.text.input.KeyboardType = androidx.compose.ui.text.input.KeyboardType.Unspecified,
+    singleLine: Boolean = false
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    val current = prefs.getString(prefKey, "") ?: ""
+    EditableFieldRow(
+        label = label,
+        value = current,
+        placeholder = placeholder,
+        onClick = { showDialog = true }
+    )
+    if (showDialog) {
+        helium314.keyboard.settings.dialogs.TextInputDialog(
+            onDismissRequest = { showDialog = false },
+            onConfirmed = {
+                prefs.edit { putString(prefKey, it) }
+                helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            },
+            initialText = current,
+            title = { Text(label) },
+            description = if (dialogDescription == null) null else { { Text(dialogDescription) } },
+            singleLine = singleLine,
+            keyboardType = keyboardType,
+            checkTextValid = { true }
+        )
+    }
+}
+
+@Composable
+private fun EditableSecretField(
+    secretKey: String,
+    label: String,
+    placeholder: String = "Tap to enter your API key…",
+    dialogDescription: String? = null
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    var current by remember { mutableStateOf(helium314.keyboard.latin.ai.SecureApiKeys.getKey(secretKey)) }
+    EditableFieldRow(
+        label = label,
+        value = current,
+        placeholder = placeholder,
+        isSecret = true,
+        onClick = { showDialog = true }
+    )
+    if (showDialog) {
+        helium314.keyboard.settings.dialogs.TextInputDialog(
+            onDismissRequest = { showDialog = false },
+            onConfirmed = {
+                val trimmed = it.trim()
+                helium314.keyboard.latin.ai.SecureApiKeys.setKey(secretKey, trimmed)
+                current = trimmed
+                helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            },
+            initialText = current,
+            title = { Text(label) },
+            description = if (dialogDescription == null) null else { { Text(dialogDescription) } },
+            singleLine = true,
+            selectAllOnOpen = true,
+            checkTextValid = { true }
+        )
+    }
+}
+
+// =============================================================================
+// TAB 1: GENERAL
+// =============================================================================
+
+@Composable
+private fun GeneralTab(
+    prefs: android.content.SharedPreferences,
+    ollamaModels: List<String>,
+    openaiCompatModels: List<String> = emptyList()
+) {
+    val teal = brandTeal()
+    val currentFilter = prefs.getString(Settings.PREF_AI_MODEL_FILTER, Defaults.PREF_AI_MODEL_FILTER) ?: Defaults.PREF_AI_MODEL_FILTER
+
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 48.dp)) {
+        // About me / Lorebook
+        EditablePrefField(
+            prefs = prefs,
+            prefKey = Settings.PREF_AI_LOREBOOK,
+            label = stringResource(R.string.ai_lorebook_label),
+            placeholder = "Tap to tell the AI about yourself…",
+            dialogDescription = "Tell the AI about yourself. This context is included with every request so the AI knows your name, writing style, preferences, etc."
+        )
+        Text(
+            "Tell the AI about yourself. This context is included with every request so the AI knows your name, writing style, preferences, etc.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        // AI Instruction
+        EditablePrefField(
+            prefs = prefs,
+            prefKey = Settings.PREF_AI_INSTRUCTION,
+            label = stringResource(R.string.ai_instruction_label),
+            placeholder = "Tap to set the AI instruction…",
+            dialogDescription = "This instruction only applies to base models. Custom models created via Ollama Model Wizard use their built-in prompt instead."
+        )
+        Text(
+            "This instruction only applies to base models. Custom models created via Ollama Model Wizard use their built-in prompt instead.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        // Allow network tools (off by default for privacy)
+        helium314.keyboard.settings.preferences.SwitchPreference(
+            name = "Allow tools that access the internet",
+            key = Settings.PREF_AI_ALLOW_NETWORK_TOOLS,
+            default = Defaults.PREF_AI_ALLOW_NETWORK_TOOLS,
+            description = "When off, the model can still use local tools (calculator, date/time) but not fetch_url or weather. Keep off if you want conversations to stay fully local."
+        )
+
+        // Allow action tools (off by default — visible side effects)
+        helium314.keyboard.settings.preferences.SwitchPreference(
+            name = "Allow tools that perform actions",
+            key = Settings.PREF_AI_ALLOW_ACTIONS,
+            default = Defaults.PREF_AI_ALLOW_ACTIONS,
+            description = "Lets the model start a timer or open an app. Off by default because these trigger visible side effects."
+        )
+
+        // Cloud fallback when local server is unreachable
+        helium314.keyboard.settings.preferences.SwitchPreference(
+            name = "Cloud fallback",
+            key = Settings.PREF_AI_CLOUD_FALLBACK,
+            default = Defaults.PREF_AI_CLOUD_FALLBACK,
+            description = "When your local server (Ollama/LM Studio) is unreachable, all shortcuts and models automatically use a cloud model. Reverts when the server is back online."
+        )
+
+        // Inline model picker
+        val allInlineModels = remember(ollamaModels.size, openaiCompatModels.size, currentFilter) {
+            val items = mutableListOf<Pair<String, String>>()
+            if (currentFilter != "local") {
+                for (m in cloudModels) {
+                    if (!AiServiceSync.hasApiKey(m.second)) continue
+                    items.add(m)
+                }
+            }
+            if (currentFilter != "cloud") {
+                for (m in ollamaModels) items.add("$m (Ollama)" to "ollama:$m")
+                for (m in openaiCompatModels) items.add("$m (custom)" to "openai:$m")
+            }
+            items.toList()
+        }
+        val currentInlineModel = prefs.getString(Settings.PREF_AI_INLINE_MODEL, Defaults.PREF_AI_INLINE_MODEL) ?: Defaults.PREF_AI_INLINE_MODEL
+        val currentInlineItem = allInlineModels.firstOrNull { it.second == currentInlineModel } ?: (currentInlineModel to currentInlineModel)
+        var showInlineDialog by remember { mutableStateOf(false) }
+
+        BrandCard {
+            Column {
+                Text(
+                    stringResource(R.string.ai_inline_model),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    currentInlineItem.first,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showInlineDialog = true }
+                        .padding(vertical = 8.dp)
+                )
+                Text(
+                    stringResource(R.string.ai_inline_model_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
+        if (showInlineDialog) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showInlineDialog = false },
+                items = allInlineModels,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_INLINE_MODEL, it.second) }
+                },
+                selectedItem = allInlineModels.firstOrNull { it.second == currentInlineModel },
+                title = { Text(stringResource(R.string.ai_inline_model)) },
+                getItemName = { it.first }
+            )
+        }
+
+        // Conversation model picker (reuses the same allInlineModels list)
+        val currentConversationModel = prefs.getString(Settings.PREF_AI_CONVERSATION_MODEL, Defaults.PREF_AI_CONVERSATION_MODEL) ?: Defaults.PREF_AI_CONVERSATION_MODEL
+        val currentConversationItem = allInlineModels.firstOrNull { it.second == currentConversationModel } ?: (currentConversationModel to currentConversationModel)
+        var showConversationDialog by remember { mutableStateOf(false) }
+
+        BrandCard {
+            Column {
+                Text(
+                    stringResource(R.string.ai_conversation_model),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    currentConversationItem.first,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showConversationDialog = true }
+                        .padding(vertical = 8.dp)
+                )
+                Text(
+                    stringResource(R.string.ai_conversation_model_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
+        if (showConversationDialog) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showConversationDialog = false },
+                items = allInlineModels,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_CONVERSATION_MODEL, it.second) }
+                },
+                selectedItem = allInlineModels.firstOrNull { it.second == currentConversationModel },
+                title = { Text(stringResource(R.string.ai_conversation_model)) },
+                getItemName = { it.first }
+            )
+        }
+
+        // Model filter
+        val filterItems = listOf(
+            stringResource(R.string.ai_model_filter_local) to "local",
+            stringResource(R.string.ai_model_filter_cloud) to "cloud",
+            stringResource(R.string.ai_model_filter_both) to "both",
+        )
+        val currentFilterItem = filterItems.firstOrNull { it.second == currentFilter } ?: filterItems[0]
+        var showFilterDialog by remember { mutableStateOf(false) }
+
+        BrandCard {
+            Column {
+                Text(
+                    stringResource(R.string.ai_model_filter),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    currentFilterItem.first,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showFilterDialog = true }
+                        .padding(vertical = 8.dp)
+                )
+            }
+        }
+        if (showFilterDialog) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showFilterDialog = false },
+                items = filterItems,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_MODEL_FILTER, it.second) }
+                },
+                selectedItem = currentFilterItem,
+                title = { Text(stringResource(R.string.ai_model_filter)) },
+                getItemName = { it.first }
+            )
+        }
+
+        // MCP model picker
+        val currentMcpModel = prefs.getString(Settings.PREF_AI_MCP_MODEL, Defaults.PREF_AI_MCP_MODEL) ?: Defaults.PREF_AI_MCP_MODEL
+        val mcpModelDisplay = if (currentMcpModel.isEmpty()) "Default (${currentInlineItem.first})" else (allInlineModels.firstOrNull { it.second == currentMcpModel }?.first ?: currentMcpModel)
+        var showMcpModelDialog by remember { mutableStateOf(false) }
+
+        BrandCard {
+            Column {
+                Text(
+                    "MCP / Actions model",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    mcpModelDisplay,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showMcpModelDialog = true }
+                        .padding(vertical = 8.dp)
+                )
+                Text(
+                    "Model used for tool calling / MCP commands. Some models handle tools much better than others.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (showMcpModelDialog) {
+            val mcpItems = listOf("Default (use main model)" to "") + allInlineModels
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showMcpModelDialog = false },
+                items = mcpItems,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_MCP_MODEL, it.second) }
+                },
+                selectedItem = mcpItems.firstOrNull { it.second == currentMcpModel },
+                title = { Text("MCP / Actions model") },
+                getItemName = { it.first }
+            )
+        }
+
+        // MCP (Model Context Protocol) servers
+        McpServersSection(prefs, teal)
+
+    }
+}
+
+// =============================================================================
+// TAB 2: LOCAL
+// =============================================================================
+
+@Composable
+private fun LocalTab(
+    prefs: android.content.SharedPreferences,
+    ollamaModels: MutableList<String>,
+    openaiCompatModels: MutableList<String>,
+    connectionStatus: ConnectionStatus,
+    openaiCompatStatus: ConnectionStatus,
+    scope: kotlinx.coroutines.CoroutineScope,
+    onClickModelWizard: () -> Unit,
+    onConnectionStatusChange: (ConnectionStatus) -> Unit,
+    onOpenAiCompatStatusChange: (ConnectionStatus) -> Unit
+) {
+    val teal = brandTeal()
+    val ctx = LocalContext.current
+    val currentModel = prefs.getString(Settings.PREF_AI_MODEL, Defaults.PREF_AI_MODEL) ?: Defaults.PREF_AI_MODEL
+    val isLocal = currentModel.startsWith("ollama:")
+    val isOnnx = currentModel.startsWith("onnx:")
+
+    val localModelItems = remember(ollamaModels.size, currentModel) {
+        val items = mutableListOf<Pair<String, String>>()
+        for (model in ollamaModels) {
+            items.add(model to "ollama:$model")
+        }
+        if (currentModel.startsWith("ollama:")) {
+            val currentOllamaModel = currentModel.substringAfter("ollama:")
+            if (ollamaModels.none { it == currentOllamaModel }) {
+                items.add(currentOllamaModel to currentModel)
+            }
+        }
+        if (items.isEmpty()) {
+            items.add("(no models found)" to "ollama:gemma3:4b")
+        }
+        items.toList()
+    }
+
+    val openaiCompatModelItems = remember(openaiCompatModels.size, currentModel) {
+        val items = mutableListOf<Pair<String, String>>()
+        for (model in openaiCompatModels) {
+            items.add(model to "openai:$model")
+        }
+        if (currentModel.startsWith("openai:")) {
+            val currentOpenAiModel = currentModel.substringAfter("openai:")
+            if (openaiCompatModels.none { it == currentOpenAiModel }) {
+                items.add(currentOpenAiModel to currentModel)
+            }
+        }
+        items.toList()
+    }
+
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 48.dp)) {
+        // ========== Ollama section ==========
+        Text(
+            "Ollama",
+            style = MaterialTheme.typography.titleLarge,
+            color = teal,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        )
+
+        // Ollama URL
+        EditablePrefField(
+            prefs = prefs,
+            prefKey = Settings.PREF_OLLAMA_URL,
+            label = stringResource(R.string.ollama_url),
+            placeholder = "Tap to enter your Ollama URL…",
+            dialogDescription = "Enter your Tailscale IP or local URL, e.g. http://100.x.x.x:11434",
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+            singleLine = true
+        )
+
+        // Ollama LAN fallback URL — used automatically when the primary URL is unreachable
+        EditablePrefField(
+            prefs = prefs,
+            prefKey = Settings.PREF_OLLAMA_URL_FALLBACK,
+            label = "LAN fallback URL (optional)",
+            placeholder = "Tap to enter your LAN URL…",
+            dialogDescription = "Used automatically when the primary URL is unreachable. Handy if Tailscale is down and you're at home, e.g. http://192.168.1.50:11434",
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+            singleLine = true
+        )
+
+        // Connect button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .padding(vertical = 10.dp, horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = {
+                    onConnectionStatusChange(ConnectionStatus.Connecting)
+                    scope.launch(Dispatchers.IO) {
+                        AiServiceSync.invalidateOllamaUrlCache()
+                        val primary = AiServiceSync.normalizeOllamaUrl(
+                            prefs.getString(Settings.PREF_OLLAMA_URL, Defaults.PREF_OLLAMA_URL) ?: Defaults.PREF_OLLAMA_URL
+                        )
+                        val fallback = AiServiceSync.normalizeOllamaUrl(
+                            prefs.getString(Settings.PREF_OLLAMA_URL_FALLBACK, "") ?: ""
+                        )
+                        val attempts = mutableListOf<Pair<String, String>>() // url to error
+                        var success: Pair<String, List<String>>? = null
+
+                        for ((label, url) in listOf("primary" to primary, "fallback" to fallback)) {
+                            if (url.isBlank()) continue
+                            try {
+                                val models = AiServiceSync.fetchOllamaModels(url)
+                                if (models.isNotEmpty()) {
+                                    success = url to models
+                                    break
+                                } else {
+                                    attempts += url to "no models"
+                                }
+                            } catch (e: Exception) {
+                                attempts += url to (e.message ?: "unknown error")
+                            }
+                        }
+
+                        if (success != null) {
+                            ollamaModels.clear()
+                            ollamaModels.addAll(success.second)
+                            val usedLabel = if (success.first == primary) "primary" else "fallback"
+                            onConnectionStatusChange(
+                                ConnectionStatus.Connected(success.second.size, "via $usedLabel: ${success.first}")
+                            )
+                        } else {
+                            val msg = if (attempts.isEmpty()) {
+                                "No URL configured"
+                            } else {
+                                attempts.joinToString("  |  ") { "${it.first} → ${it.second}" }
+                            }
+                            onConnectionStatusChange(ConnectionStatus.Failed(msg))
+                        }
+                    }
+                },
+                colors = brandButtonColors(),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(stringResource(R.string.ollama_test_connection))
+            }
+            when (val status = connectionStatus) {
+                is ConnectionStatus.Connecting -> {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = teal)
+                    Text(stringResource(R.string.ollama_connecting), style = MaterialTheme.typography.bodyMedium)
+                }
+                is ConnectionStatus.Connected -> {
+                    Column {
+                        Text(
+                            String.format(stringResource(R.string.ollama_connected), status.modelCount),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = teal
+                        )
+                        status.details?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = teal.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+                is ConnectionStatus.Failed -> {
+                    Text(
+                        String.format(stringResource(R.string.ollama_connection_failed), status.error),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> {}
+            }
+        }
+
+        // Local model picker
+        var showModelDialog by remember { mutableStateOf(false) }
+        BrandCard {
+            Column {
+                Text(
+                    stringResource(R.string.ai_model),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                val selectedLocal = localModelItems.firstOrNull { it.second == currentModel }
+                Text(
+                    if (isLocal) (selectedLocal?.first ?: currentModel.substringAfter("ollama:")) else "(select a local model)",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showModelDialog = true }
+                        .padding(vertical = 8.dp)
+                )
+            }
+        }
+        if (showModelDialog) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showModelDialog = false },
+                items = localModelItems,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_MODEL, it.second) }
+                },
+                selectedItem = localModelItems.firstOrNull { it.second == currentModel },
+                title = { Text(stringResource(R.string.ai_model)) },
+                getItemName = { it.first }
+            )
+        }
+
+        // Model Wizard button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(BrandGradient)
+                .clickable { onClickModelWizard() }
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    "Ollama Model Wizard",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Pull, create, and manage Ollama models",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            }
+            Text(">>", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        // ========== OpenAI-compatible section ==========
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.padding(vertical = 16.dp, horizontal = 12.dp),
+            color = brandSurfaceVariant()
+        )
+        Text(
+            "OpenAI-compatible",
+            style = MaterialTheme.typography.titleLarge,
+            color = teal,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+        )
+
+        // OpenAI-compatible (LM Studio / vLLM / llama.cpp / ...) section — collapsible
+        var openaiCompatExpanded by remember { mutableStateOf(false) }
+        var showOpenAiModelDialog by remember { mutableStateOf(false) }
+        BrandCard {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { openaiCompatExpanded = !openaiCompatExpanded },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "OpenAI-compatible server",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = teal,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "LM Studio, vLLM, llama.cpp, KoboldCpp, Jan, Msty, …",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                    Text(
+                        if (openaiCompatExpanded) "\u25B2" else "\u25BC",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = teal
+                    )
+                }
+                if (openaiCompatExpanded) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Connect to LM Studio, vLLM, llama.cpp and similar tools. Default ports: LM Studio 1234, vLLM 8000, llama.cpp 8080.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                EditablePrefField(
+                    prefs = prefs,
+                    prefKey = Settings.PREF_OPENAI_COMPAT_URL,
+                    label = "Server URL",
+                    placeholder = "Tap to enter your server URL…",
+                    dialogDescription = "e.g. http://192.168.1.50:1234 (LM Studio default port). Make sure the server is bound to the network, not just localhost.",
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                    singleLine = true
+                )
+                EditablePrefField(
+                    prefs = prefs,
+                    prefKey = Settings.PREF_OPENAI_COMPAT_URL_FALLBACK,
+                    label = "LAN fallback URL (optional)",
+                    placeholder = "Tap to enter your LAN URL…",
+                    dialogDescription = "Used automatically when the primary URL is unreachable. Handy if Tailscale is down and you're at home, e.g. http://192.168.1.50:1234",
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                    singleLine = true
+                )
+                EditableSecretField(
+                    secretKey = Settings.PREF_OPENAI_COMPAT_API_KEY,
+                    label = "API key (optional)",
+                    placeholder = "Leave blank for local servers",
+                    dialogDescription = "Most local servers don't require a key. Only set this if your server is behind authentication."
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            onOpenAiCompatStatusChange(ConnectionStatus.Connecting)
+                            scope.launch(Dispatchers.IO) {
+                                AiServiceSync.invalidateOpenAiCompatUrlCache()
+                                val primary = AiServiceSync.normalizeOllamaUrl(
+                                    prefs.getString(Settings.PREF_OPENAI_COMPAT_URL, "") ?: ""
+                                )
+                                val fallback = AiServiceSync.normalizeOllamaUrl(
+                                    prefs.getString(Settings.PREF_OPENAI_COMPAT_URL_FALLBACK, "") ?: ""
+                                )
+                                if (primary.isBlank() && fallback.isBlank()) {
+                                    onOpenAiCompatStatusChange(ConnectionStatus.Failed("Set the URL first"))
+                                    return@launch
+                                }
+                                val key = helium314.keyboard.latin.ai.SecureApiKeys.getKey(Settings.PREF_OPENAI_COMPAT_API_KEY)
+                                val attempts = mutableListOf<Pair<String, String>>()
+                                var success: Pair<String, List<String>>? = null
+                                for ((label, url) in listOf("primary" to primary, "fallback" to fallback)) {
+                                    if (url.isBlank()) continue
+                                    try {
+                                        val models = AiServiceSync.fetchOpenAiCompatibleModels(url, key)
+                                        if (models.isNotEmpty()) {
+                                            success = url to models
+                                            break
+                                        } else {
+                                            attempts += url to "no models"
+                                        }
+                                    } catch (e: Exception) {
+                                        attempts += url to (e.message ?: "unknown error")
+                                    }
+                                }
+                                if (success != null) {
+                                    openaiCompatModels.clear()
+                                    openaiCompatModels.addAll(success.second)
+                                    val usedLabel = if (success.first == primary) "primary" else "fallback"
+                                    onOpenAiCompatStatusChange(
+                                        ConnectionStatus.Connected(success.second.size, "via $usedLabel: ${success.first}")
+                                    )
+                                } else {
+                                    onOpenAiCompatStatusChange(
+                                        ConnectionStatus.Failed(attempts.joinToString("  |  ") { "${it.first} → ${it.second}" })
+                                    )
+                                }
+                            }
+                        },
+                        colors = brandButtonColors(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Test connection")
+                    }
+                    when (val status = openaiCompatStatus) {
+                        is ConnectionStatus.Connecting -> {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = teal)
+                            Text("Connecting…", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        is ConnectionStatus.Connected -> {
+                            Column {
+                                Text(
+                                    "Connected (${status.modelCount} models)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = teal
+                                )
+                                status.details?.let {
+                                    Text(
+                                        it,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = teal.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        }
+                        is ConnectionStatus.Failed -> {
+                            Text(
+                                "Failed: ${status.error}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        else -> {}
+                    }
+                }
+
+                // Model picker (inside the collapsible section)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.ai_model),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                val selectedOpenAi = openaiCompatModelItems.firstOrNull { it.second == currentModel }
+                val pickerLabel = when {
+                    currentModel.startsWith("openai:") ->
+                        selectedOpenAi?.first ?: currentModel.substringAfter("openai:")
+                    openaiCompatModelItems.isEmpty() -> "(set the URL and Test connection first)"
+                    else -> "(select a model)"
+                }
+                Text(
+                    pickerLabel,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = openaiCompatModelItems.isNotEmpty()) {
+                            showOpenAiModelDialog = true
+                        }
+                        .padding(vertical = 8.dp)
+                )
+                } // end if (openaiCompatExpanded)
+            }
+        }
+        if (showOpenAiModelDialog) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showOpenAiModelDialog = false },
+                items = openaiCompatModelItems,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_MODEL, it.second) }
+                },
+                selectedItem = openaiCompatModelItems.firstOrNull { it.second == currentModel },
+                title = { Text(stringResource(R.string.ai_model)) },
+                getItemName = { it.first }
+            )
+        }
+
+        // ONNX section
+        OnnxSection(prefs, ctx, scope, teal)
+
+        // ========== Model Presets (shared with Cloud tab) ==========
+        val combinedForLocalTab = remember(ollamaModels.size, openaiCompatModels.size) {
+            val items = mutableListOf<Pair<String, String>>()
+            ollamaModels.forEach { items.add(it to "ollama:$it") }
+            openaiCompatModels.forEach { items.add(it to "openai:$it") }
+            items.addAll(AiServiceSync.CLOUD_MODELS)
+            items
+        }
+        ModelPresetsSection(prefs, teal, combinedForLocalTab)
+    }
+}
+
+@Composable
+private fun OnnxSection(
+    prefs: android.content.SharedPreferences,
+    ctx: Context,
+    scope: kotlinx.coroutines.CoroutineScope,
+    teal: Color
+) {
+    val currentModel = prefs.getString(Settings.PREF_AI_MODEL, Defaults.PREF_AI_MODEL) ?: Defaults.PREF_AI_MODEL
+    val isOnnx = currentModel.startsWith("onnx:")
+    var hasModel by remember { mutableStateOf(helium314.keyboard.latin.ai.OnnxInferenceService.hasModelFiles(ctx)) }
+    var importStatus by remember { mutableStateOf("") }
+
+    val filePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        scope.launch(Dispatchers.IO) {
+            val modelDir = helium314.keyboard.latin.ai.OnnxInferenceService.getModelDir(ctx)
+            var copied = 0
+            for (uri in uris) {
+                val fileName = getFileName(ctx, uri) ?: continue
+                val targetName = when {
+                    fileName.startsWith("tokenizer") && fileName.endsWith(".json") -> "tokenizer.json"
+                    fileName.contains("encoder") && fileName.endsWith(".onnx") -> "encoder_model.onnx"
+                    fileName.contains("decoder") && fileName.contains("merged") && fileName.endsWith(".onnx") -> "decoder_model_merged.onnx"
+                    fileName.contains("decoder") && fileName.endsWith(".onnx") -> "decoder_model.onnx"
+                    else -> null
+                }
+                if (targetName != null) {
+                    try {
+                        ctx.contentResolver.openInputStream(uri)?.use { input ->
+                            java.io.File(modelDir, targetName).outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        copied++
+                    } catch (e: Exception) {
+                        Log.e("AISettings", "Failed to copy $fileName -> $targetName", e)
+                    }
+                }
+            }
+            importStatus = "Imported $copied file(s)"
+            hasModel = helium314.keyboard.latin.ai.OnnxInferenceService.hasModelFiles(ctx)
+        }
+    }
+
+    androidx.compose.material3.HorizontalDivider(
+        modifier = Modifier.padding(vertical = 12.dp, horizontal = 12.dp),
+        color = brandSurfaceVariant()
+    )
+
+    var onnxExpanded by remember { mutableStateOf(false) }
+    BrandCard {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onnxExpanded = !onnxExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "On-device (ONNX)",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = teal,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (hasModel) "T5 (on-device)" else "No model loaded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Text(
+                    if (onnxExpanded) "\u25B2" else "\u25BC",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal
+                )
+            }
+            if (onnxExpanded) {
+            Spacer(Modifier.height(8.dp))
+
+            if (!isOnnx) {
+                OutlinedButton(
+                    onClick = { prefs.edit { putString(Settings.PREF_AI_MODEL, "onnx:t5") } },
+                    colors = brandOutlinedButtonColors(),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) { Text("Activate ONNX") }
+            }
+
+            Button(
+                onClick = { filePicker.launch(arrayOf("*/*")) },
+                colors = brandButtonColors(),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.padding(vertical = 8.dp)
+            ) { Text("Import model files") }
+
+            if (importStatus.isNotBlank()) {
+                Text(
+                    importStatus,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = teal,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+
+            Text(
+                "Select encoder_model.onnx, decoder_model_merged.onnx, and tokenizer.json from your Downloads.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            Text(
+                "Browse T5 ONNX models on HuggingFace",
+                style = MaterialTheme.typography.bodySmall,
+                color = teal,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .padding(vertical = 4.dp)
+                    .clickable {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/models?search=t5+onnx&sort=downloads")))
+                    }
+            )
+
+            if (hasModel) {
+                var loadStatus by remember { mutableStateOf("") }
+                OutlinedButton(
+                    onClick = {
+                        loadStatus = "Loading..."
+                        scope.launch(Dispatchers.IO) {
+                            val ok = helium314.keyboard.latin.ai.OnnxInferenceService.loadModel(ctx)
+                            loadStatus = if (ok) "Model loaded" else "Failed to load"
+                        }
+                    },
+                    colors = brandOutlinedButtonColors(),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) { Text("Test load model") }
+                if (loadStatus.isNotBlank()) {
+                    Text(
+                        loadStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (loadStatus == "Model loaded") teal else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            }
+            } // end if (onnxExpanded)
+        }
+    }
+}
+
+// =============================================================================
+// TAB 3: CLOUD
+// =============================================================================
+
+@Composable
+private fun CloudTab(
+    prefs: android.content.SharedPreferences,
+    ollamaModels: List<String>
+) {
+    val teal = brandTeal()
+    val currentModel = prefs.getString(Settings.PREF_AI_MODEL, Defaults.PREF_AI_MODEL) ?: Defaults.PREF_AI_MODEL
+    val isCloud = !currentModel.startsWith("ollama:") && !currentModel.startsWith("onnx:")
+
+    val ctx = LocalContext.current
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 48.dp)) {
+        // API Keys
+        Text(
+            "API Keys",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = teal,
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp)
+        )
+        Text(
+            "Get a free API key for Groq at console.groq.com, or for Gemini at aistudio.google.com (availability depends on your country).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+        )
+        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Text(
+                "Get Groq key",
+                style = MaterialTheme.typography.bodySmall,
+                color = teal,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/")))
+                }
+            )
+            Text(
+                "  •  ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+            Text(
+                "Get Gemini key",
+                style = MaterialTheme.typography.bodySmall,
+                color = teal,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/")))
+                }
+            )
+        }
+        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Text(
+                "Get Anthropic key",
+                style = MaterialTheme.typography.bodySmall,
+                color = teal,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.anthropic.com/")))
+                }
+            )
+            Text(
+                "  •  ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+            Text(
+                "Get OpenAI key",
+                style = MaterialTheme.typography.bodySmall,
+                color = teal,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://platform.openai.com/api-keys")))
+                }
+            )
+        }
+
+        EditableSecretField(
+            secretKey = Settings.PREF_GEMINI_API_KEY,
+            label = stringResource(R.string.gemini_api_key),
+            placeholder = "Tap to enter your Gemini API key…"
+        )
+        EditableSecretField(
+            secretKey = Settings.PREF_GROQ_API_KEY,
+            label = stringResource(R.string.groq_api_key),
+            placeholder = "Tap to enter your Groq API key…"
+        )
+        EditableSecretField(
+            secretKey = Settings.PREF_OPENROUTER_API_KEY,
+            label = stringResource(R.string.openrouter_api_key),
+            placeholder = "Tap to enter your OpenRouter API key…"
+        )
+        EditableSecretField(
+            secretKey = Settings.PREF_ANTHROPIC_API_KEY,
+            label = stringResource(R.string.anthropic_api_key),
+            placeholder = "Tap to enter your Anthropic API key…"
+        )
+        EditableSecretField(
+            secretKey = Settings.PREF_OPENAI_API_KEY,
+            label = stringResource(R.string.openai_api_key),
+            placeholder = "Tap to enter your OpenAI API key…"
+        )
+        EditableSecretField(
+            secretKey = Settings.PREF_TAVILY_API_KEY,
+            label = stringResource(R.string.tavily_api_key),
+            placeholder = "Tap to enter your Tavily API key…"
+        )
+        Text(
+            "Recommended. Tavily is a search engine built for LLMs — it returns clean, pre-processed snippets that the model can reason over reliably. Get a free key at tavily.com (1000 credits/month, advanced search uses 2 credits per query).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        EditableSecretField(
+            secretKey = Settings.PREF_BRAVE_SEARCH_API_KEY,
+            label = stringResource(R.string.brave_search_api_key),
+            placeholder = "Tap to enter your Brave Search API key…"
+        )
+        Text(
+            "Optional fallback. If Tavily is not set or fails, web_search uses Brave's official API. Without either key, it falls back to scraping Brave's public results page. Get a free Brave key at api.search.brave.com (2000 queries/month).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        // Cloud model picker
+        var showModelDialog by remember { mutableStateOf(false) }
+        BrandCard {
+            Column {
+                Text(
+                    "Default cloud model",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                val selectedCloud = cloudModels.firstOrNull { it.second == currentModel }
+                Text(
+                    if (isCloud) (selectedCloud?.first ?: currentModel) else "(select a cloud model)",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showModelDialog = true }
+                        .padding(vertical = 8.dp)
+                )
+            }
+        }
+        if (showModelDialog) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showModelDialog = false },
+                items = cloudModels,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_MODEL, it.second) }
+                },
+                selectedItem = cloudModels.firstOrNull { it.second == currentModel },
+                title = { Text("Default cloud model") },
+                getItemName = { it.first }
+            )
+        }
+
+        // Model Presets section — combined list (cloud + cached local)
+        val combinedForCloudTab = remember(ollamaModels.size) {
+            val items = mutableListOf<Pair<String, String>>()
+            items.addAll(AiServiceSync.CLOUD_MODELS)
+            helium314.keyboard.latin.ai.cachedOllamaModels(prefs).forEach {
+                items.add(it.displayName to it.modelValue)
+            }
+            helium314.keyboard.latin.ai.cachedOpenAiCompatibleModels(prefs).forEach {
+                items.add(it.displayName to it.modelValue)
+            }
+            items
+        }
+        ModelPresetsSection(prefs, teal, combinedForCloudTab)
+    }
+}
+
+@Composable
+private fun ModelPresetsSection(
+    prefs: android.content.SharedPreferences,
+    teal: Color,
+    availableModels: List<Pair<String, String>>
+) {
+    var presetsJson by remember { mutableStateOf(prefs.getString(Settings.PREF_AI_CLOUD_PRESETS, Defaults.PREF_AI_CLOUD_PRESETS) ?: "[]") }
+    val presets = remember(presetsJson) { parsePresets(presetsJson) }
+
+    fun savePresets(list: List<CloudPreset>) {
+        val json = presetsToJson(list)
+        prefs.edit { putString(Settings.PREF_AI_CLOUD_PRESETS, json) }
+        presetsJson = json
+    }
+
+    Text(
+        "Model Presets",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = teal,
+        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 4.dp)
+    )
+    Text(
+        "Create named presets that pair a model (cloud, Ollama, or OpenAI-compatible) with a prompt. Assign them to shortcut keys for quick access.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+
+    // Existing presets
+    for (i in presets.indices) {
+        var expanded by remember { mutableStateOf(false) }
+        var editName by remember(presetsJson, i) { mutableStateOf(presets[i].name) }
+        var editPrompt by remember(presetsJson, i) { mutableStateOf(presets[i].prompt) }
+        var showModelPicker by remember { mutableStateOf(false) }
+        var editModel by remember(presetsJson, i) { mutableStateOf(presets[i].model) }
+
+        BrandCard {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = !expanded },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            presets[i].name.ifBlank { "Unnamed preset" },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = teal,
+                            fontWeight = FontWeight.Bold
+                        )
+                        val modelDisplay = availableModels.firstOrNull { it.second == presets[i].model }?.first ?: presets[i].model
+                        Text(
+                            modelDisplay,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                    Text(
+                        if (expanded) "\u25B2" else "\u25BC",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = teal
+                    )
+                }
+                if (expanded) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Name") },
+                        singleLine = true,
+                        colors = brandOutlinedTextFieldColors(teal),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+
+                    // Model picker
+                    val modelDisplay = availableModels.firstOrNull { it.second == editModel }?.first ?: editModel
+                    OutlinedButton(
+                        onClick = { showModelPicker = true },
+                        colors = brandOutlinedButtonColors(),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) { Text("Model: $modelDisplay") }
+
+                    androidx.compose.material3.OutlinedTextField(
+                        value = editPrompt,
+                        onValueChange = { editPrompt = it },
+                        label = { Text("Prompt (optional)") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .heightIn(min = 80.dp, max = 200.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        colors = brandOutlinedTextFieldColors(teal),
+                        minLines = 3
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val updated = presets.toMutableList()
+                                updated.removeAt(i)
+                                savePresets(updated)
+                            },
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Delete", style = MaterialTheme.typography.labelSmall) }
+                        Button(
+                            onClick = {
+                                val updated = presets.toMutableList()
+                                updated[i] = presets[i].copy(name = editName, model = editModel, prompt = editPrompt)
+                                savePresets(updated)
+                                expanded = false
+                            },
+                            colors = brandButtonColors(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Save", style = MaterialTheme.typography.labelSmall) }
+                    }
+                }
+            }
+        }
+
+        if (showModelPicker) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showModelPicker = false },
+                items = availableModels,
+                onItemSelected = { editModel = it.second },
+                selectedItem = availableModels.firstOrNull { it.second == editModel },
+                title = { Text("Choose model") },
+                getItemName = { it.first }
+            )
+        }
+    }
+
+    // Add preset button
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        OutlinedButton(
+            onClick = {
+                val defaultModel = availableModels.firstOrNull()?.second ?: "gemini:gemini-2.5-flash"
+                val updated = presets.toMutableList()
+                updated.add(CloudPreset(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = "",
+                    model = defaultModel,
+                    prompt = ""
+                ))
+                savePresets(updated)
+            },
+            colors = brandOutlinedButtonColors(),
+            shape = RoundedCornerShape(8.dp)
+        ) { Text("+ Add preset") }
+    }
+}
+
+// =============================================================================
+// TAB 4: VOICE
+// =============================================================================
+
+@Composable
+private fun VoiceTab(
+    prefs: android.content.SharedPreferences,
+    ollamaModels: List<String> = emptyList(),
+    openaiCompatModels: List<String> = emptyList()
+) {
+    val teal = brandTeal()
+    val currentFilter = prefs.getString(Settings.PREF_AI_MODEL_FILTER, Defaults.PREF_AI_MODEL_FILTER) ?: Defaults.PREF_AI_MODEL_FILTER
+    val allModels = remember(ollamaModels.size, openaiCompatModels.size, currentFilter) {
+        val items = mutableListOf<Pair<String, String>>()
+        if (currentFilter != "local") {
+            for (m in cloudModels) {
+                if (!AiServiceSync.hasApiKey(m.second)) continue
+                items.add(m)
+            }
+        }
+        if (currentFilter != "cloud") {
+            for (m in ollamaModels) items.add("$m (Ollama)" to "ollama:$m")
+            for (m in openaiCompatModels) items.add("$m (custom)" to "openai:$m")
+        }
+        items.toList()
+    }
+    val currentVoiceModel = prefs.getString(Settings.PREF_AI_VOICE_MODEL, Defaults.PREF_AI_VOICE_MODEL) ?: Defaults.PREF_AI_VOICE_MODEL
+    val currentVoiceItem = allModels.firstOrNull { it.second == currentVoiceModel } ?: (currentVoiceModel to currentVoiceModel)
+    var showVoiceModelDialog by remember { mutableStateOf(false) }
+
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 48.dp)) {
+        BrandCard {
+            Column {
+                Text(
+                    "Voice model",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = teal,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    if (currentVoiceModel.isBlank()) "(uses main model)" else currentVoiceItem.first,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showVoiceModelDialog = true }
+                        .padding(vertical = 8.dp)
+                )
+                Text(
+                    "Model used for voice transcription processing. Leave empty to use the main AI model.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
+        if (showVoiceModelDialog) {
+            helium314.keyboard.settings.dialogs.ListPickerDialog(
+                onDismissRequest = { showVoiceModelDialog = false },
+                items = allModels,
+                onItemSelected = {
+                    prefs.edit { putString(Settings.PREF_AI_VOICE_MODEL, it.second) }
+                },
+                selectedItem = allModels.firstOrNull { it.second == currentVoiceModel },
+                title = { Text("Voice model") },
+                getItemName = { it.first }
+            )
+        }
+        VoicePromptsSection(prefs)
+    }
+}
+
+// =============================================================================
+// VOICE PROMPTS SECTION (moved from original, unchanged)
+// =============================================================================
+
+@Composable
+private fun VoicePromptsSection(prefs: android.content.SharedPreferences) {
+    val teal = brandTeal()
+    val builtinNames = helium314.keyboard.latin.settings.Defaults.AI_VOICE_MODE_NAMES
+    val defaultPrompts = helium314.keyboard.latin.settings.Defaults.AI_VOICE_MODE_PROMPTS
+    val builtinCount = builtinNames.size
+
+    // Load custom modes
+    var customModesJson by remember { mutableStateOf(prefs.getString(Settings.PREF_AI_VOICE_CUSTOM_MODES, "[]") ?: "[]") }
+    val customModes = remember(customModesJson) {
+        try {
+            val arr = org.json.JSONArray(customModesJson)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                obj.getString("name") to obj.getString("prompt")
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    fun saveCustomModes(modes: List<Pair<String, String>>) {
+        val arr = org.json.JSONArray()
+        for ((name, prompt) in modes) {
+            val obj = org.json.JSONObject()
+            obj.put("name", name)
+            obj.put("prompt", prompt)
+            arr.put(obj)
+        }
+        val json = arr.toString()
+        prefs.edit { putString(Settings.PREF_AI_VOICE_CUSTOM_MODES, json) }
+        customModesJson = json
+    }
+
+    // Speech engine picker
+    var selectedEngine by remember { mutableStateOf(prefs.getString(Settings.PREF_AI_VOICE_ENGINE, Defaults.PREF_AI_VOICE_ENGINE) ?: "google") }
+    var whisperUrl by remember { mutableStateOf(prefs.getString(Settings.PREF_WHISPER_URL, Defaults.PREF_WHISPER_URL) ?: "") }
+    var whisperUrlFallback by remember { mutableStateOf(prefs.getString(Settings.PREF_WHISPER_URL_FALLBACK, Defaults.PREF_WHISPER_URL_FALLBACK) ?: "") }
+
+    BrandCard {
+        Column {
+            Text(
+                "Speech engine",
+                style = MaterialTheme.typography.titleMedium,
+                color = teal,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                androidx.compose.material3.FilterChip(
+                    selected = selectedEngine == "google",
+                    onClick = {
+                        selectedEngine = "google"
+                        prefs.edit { putString(Settings.PREF_AI_VOICE_ENGINE, "google") }
+                    },
+                    label = { Text("Google", color = MaterialTheme.colorScheme.onSurface) }
+                )
+                androidx.compose.material3.FilterChip(
+                    selected = selectedEngine == "whisper",
+                    onClick = {
+                        selectedEngine = "whisper"
+                        prefs.edit { putString(Settings.PREF_AI_VOICE_ENGINE, "whisper") }
+                    },
+                    label = { Text("Whisper (server)", color = MaterialTheme.colorScheme.onSurface) }
+                )
+            }
+            if (selectedEngine == "google") {
+                Text(
+                    "Uses your device's speech recognition. For offline use, download your language in: Settings > Google > Voice > Offline speech recognition.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            } else {
+                Text(
+                    "Requires a Whisper-compatible server (e.g. speaches). Leave URL empty to use your Ollama server host on port 8080.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = whisperUrl,
+                    onValueChange = {
+                        whisperUrl = it
+                        prefs.edit { putString(Settings.PREF_WHISPER_URL, it) }
+                    },
+                    label = { Text("Whisper server URL", color = MaterialTheme.colorScheme.onSurface) },
+                    placeholder = { Text("e.g. http://192.168.1.100:8080", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
+                    singleLine = true,
+                    colors = brandOutlinedTextFieldColors(teal),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = whisperUrlFallback,
+                    onValueChange = {
+                        whisperUrlFallback = it
+                        prefs.edit { putString(Settings.PREF_WHISPER_URL_FALLBACK, it) }
+                    },
+                    label = { Text("Fallback URL (optional)", color = MaterialTheme.colorScheme.onSurface) },
+                    placeholder = { Text("e.g. http://192.168.1.100:8080", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)) },
+                    singleLine = true,
+                    colors = brandOutlinedTextFieldColors(teal),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                )
+
+                // Whisper model management
+                WhisperModelSection(prefs, teal)
+            }
+        }
+    }
+
+    // Section header
+    Text(
+        "Voice Prompts",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = teal,
+        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 4.dp)
+    )
+    Text(
+        "Edit prompts per voice mode. Changes are used when voice input is processed.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+
+    // Built-in modes
+    for (i in 0 until builtinCount) {
+        val storedPrompt = prefs.getString("ai_voice_prompt_$i", null)
+        var prompt by remember(i) { mutableStateOf(storedPrompt ?: defaultPrompts[i]) }
+        var expanded by remember { mutableStateOf(false) }
+        val isCustomized = storedPrompt != null && storedPrompt != defaultPrompts[i]
+
+        BrandCard {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = !expanded },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        builtinNames[i],
+                        style = MaterialTheme.typography.labelMedium,
+                        color = teal,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (expanded) "\u25B2" else "\u25BC",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = teal
+                    )
+                }
+                if (expanded) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = prompt,
+                        onValueChange = { prompt = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .heightIn(min = 80.dp, max = 200.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        minLines = 3
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                    ) {
+                        if (isCustomized) {
+                            OutlinedButton(
+                                onClick = {
+                                    prompt = defaultPrompts[i]
+                                    prefs.edit { remove("ai_voice_prompt_$i") }
+                                },
+                                colors = brandOutlinedButtonColors(),
+                                shape = RoundedCornerShape(8.dp)
+                            ) { Text("Reset", style = MaterialTheme.typography.labelSmall) }
+                        }
+                        Button(
+                            onClick = {
+                                if (prompt == defaultPrompts[i]) {
+                                    prefs.edit { remove("ai_voice_prompt_$i") }
+                                } else {
+                                    prefs.edit { putString("ai_voice_prompt_$i", prompt) }
+                                }
+                                expanded = false
+                            },
+                            colors = brandButtonColors(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Save", style = MaterialTheme.typography.labelSmall) }
+                    }
+                }
+            }
+        }
+    }
+
+    // Custom modes
+    for (i in customModes.indices) {
+        var name by remember(customModesJson, i) { mutableStateOf(customModes[i].first) }
+        var prompt by remember(customModesJson, i) { mutableStateOf(customModes[i].second) }
+        var expanded by remember { mutableStateOf(false) }
+
+        BrandCard {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = !expanded },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        name.ifBlank { "Custom ${i + 1}" },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = teal,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (expanded) "\u25B2" else "\u25BC",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = teal
+                    )
+                }
+                if (expanded) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        singleLine = true
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = prompt,
+                        onValueChange = { prompt = it },
+                        label = { Text("Prompt") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .heightIn(min = 80.dp, max = 200.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        minLines = 3
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val updated = customModes.toMutableList()
+                                updated.removeAt(i)
+                                saveCustomModes(updated)
+                                val currentMode = prefs.getInt(Settings.PREF_AI_VOICE_MODE, 0)
+                                val deletedModeIdx = builtinCount + i
+                                if (currentMode == deletedModeIdx) {
+                                    prefs.edit { putInt(Settings.PREF_AI_VOICE_MODE, 0) }
+                                } else if (currentMode > deletedModeIdx) {
+                                    prefs.edit { putInt(Settings.PREF_AI_VOICE_MODE, currentMode - 1) }
+                                }
+                            },
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Delete", style = MaterialTheme.typography.labelSmall) }
+                        Button(
+                            onClick = {
+                                val updated = customModes.toMutableList()
+                                updated[i] = name to prompt
+                                saveCustomModes(updated)
+                                expanded = false
+                            },
+                            colors = brandButtonColors(),
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Save", style = MaterialTheme.typography.labelSmall) }
+                    }
+                }
+            }
+        }
+    }
+
+    // Add mode button
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        OutlinedButton(
+            onClick = {
+                val updated = customModes.toMutableList()
+                updated.add("Custom ${updated.size + 1}" to "")
+                saveCustomModes(updated)
+            },
+            colors = brandOutlinedButtonColors(),
+            shape = RoundedCornerShape(8.dp)
+        ) { Text("+ Add voice mode") }
+    }
+}
+
+// =============================================================================
+// WHISPER MODEL SECTION (unchanged from original)
+// =============================================================================
+
+@Composable
+private fun WhisperModelSection(prefs: android.content.SharedPreferences, teal: Color) {
+    val scope = rememberCoroutineScope()
+    var selectedModel by remember { mutableStateOf(prefs.getString(Settings.PREF_WHISPER_MODEL, Defaults.PREF_WHISPER_MODEL) ?: Defaults.PREF_WHISPER_MODEL) }
+    val installedModels = remember { mutableStateListOf<String>() }
+    var isLoading by remember { mutableStateOf(true) }
+    var statusMessage by remember { mutableStateOf("") }
+    var statusIsError by remember { mutableStateOf(false) }
+    var isDownloading by remember { mutableStateOf(false) }
+    var deleteConfirm by remember { mutableStateOf<String?>(null) }
+
+    val curatedWhisperModels = listOf(
+        "Systran/faster-whisper-tiny" to "39MB, fastest, low quality",
+        "Systran/faster-whisper-base" to "74MB, fast, basic quality",
+        "Systran/faster-whisper-small" to "244MB, good balance of speed and quality",
+        "Systran/faster-whisper-medium" to "769MB, high quality",
+        "Systran/faster-whisper-large-v1" to "1.5GB, original large model",
+        "Systran/faster-whisper-large-v2" to "1.5GB, improved large model",
+        "Systran/faster-whisper-large-v3" to "1.5GB, best accuracy",
+    )
+
+    fun refreshModels() {
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            isLoading = true
+            try {
+                val baseUrl = AiServiceSync.getWhisperBaseUrl(prefs)
+                val models = AiServiceSync.fetchWhisperModels(baseUrl)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    installedModels.clear()
+                    installedModels.addAll(models)
+                }
+            } catch (_: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    statusMessage = "Cannot connect to Whisper server"
+                    statusIsError = true
+                }
+            }
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshModels() }
+
+    androidx.compose.material3.HorizontalDivider(
+        modifier = Modifier.padding(vertical = 12.dp),
+        color = brandSurfaceVariant()
+    )
+
+    Text(
+        "Whisper models",
+        style = MaterialTheme.typography.titleSmall,
+        color = teal,
+        fontWeight = FontWeight.Bold
+    )
+
+    if (isLoading) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = teal)
+            Text("Loading...", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+        }
+    } else {
+        if (installedModels.isEmpty() && !isDownloading) {
+            Text(
+                "No models installed. Download one below.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        } else {
+            for (model in installedModels) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        androidx.compose.material3.RadioButton(
+                            selected = model == selectedModel,
+                            onClick = {
+                                selectedModel = model
+                                prefs.edit { putString(Settings.PREF_WHISPER_MODEL, model) }
+                            },
+                            colors = androidx.compose.material3.RadioButtonDefaults.colors(selectedColor = teal)
+                        )
+                        Text(
+                            model.removePrefix("Systran/faster-whisper-"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (model == selectedModel) FontWeight.Bold else FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { deleteConfirm = model },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(width = 70.dp, height = 32.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
+        if (isDownloading) {
+            androidx.compose.material3.LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                color = teal
+            )
+        }
+
+        if (statusMessage.isNotBlank()) {
+            Text(
+                statusMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (statusIsError) MaterialTheme.colorScheme.error else teal,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            color = brandSurfaceVariant()
+        )
+        Text(
+            "Download model",
+            style = MaterialTheme.typography.bodySmall,
+            color = teal,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        for ((modelId, desc) in curatedWhisperModels) {
+            val isInstalled = modelId in installedModels
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        modelId.removePrefix("Systran/faster-whisper-"),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        desc,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+                if (isInstalled) {
+                    Text("Installed", style = MaterialTheme.typography.labelSmall, color = teal)
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            isDownloading = true
+                            statusMessage = "Downloading ${modelId.removePrefix("Systran/faster-whisper-")}..."
+                            statusIsError = false
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                val baseUrl = AiServiceSync.getWhisperBaseUrl(prefs)
+                                val error = AiServiceSync.downloadWhisperModel(baseUrl, modelId)
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    isDownloading = false
+                                    if (error == null) {
+                                        statusMessage = "${modelId.removePrefix("Systran/faster-whisper-")} downloaded successfully"
+                                        statusIsError = false
+                                        if (installedModels.isEmpty()) {
+                                            selectedModel = modelId
+                                            prefs.edit { putString(Settings.PREF_WHISPER_MODEL, modelId) }
+                                        }
+                                        refreshModels()
+                                    } else {
+                                        statusMessage = "Download failed: $error"
+                                        statusIsError = true
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isDownloading,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(width = 100.dp, height = 32.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                        colors = brandOutlinedButtonColors()
+                    ) {
+                        Text("Download", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+
+    // Delete confirmation
+    deleteConfirm?.let { model ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { deleteConfirm = null },
+            title = { Text("Delete model") },
+            text = { Text("Delete '$model' from Whisper server?") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        val toDelete = model
+                        deleteConfirm = null
+                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            val baseUrl = AiServiceSync.getWhisperBaseUrl(prefs)
+                            val ok = AiServiceSync.deleteWhisperModel(baseUrl, toDelete)
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                if (ok) {
+                                    statusMessage = "'$toDelete' deleted"
+                                    statusIsError = false
+                                    if (selectedModel == toDelete && installedModels.size > 1) {
+                                        val next = installedModels.first { it != toDelete }
+                                        selectedModel = next
+                                        prefs.edit { putString(Settings.PREF_WHISPER_MODEL, next) }
+                                    }
+                                    refreshModels()
+                                } else {
+                                    statusMessage = "Error deleting model"
+                                    statusIsError = true
+                                }
+                            }
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { deleteConfirm = null }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+// =============================================================================
+// CLOUD PRESET DATA MODEL
+// =============================================================================
+
+data class CloudPreset(
+    val id: String,
+    val name: String,
+    val model: String,
+    val prompt: String
+)
+
+private fun parsePresets(json: String): List<CloudPreset> {
+    return try {
+        val arr = org.json.JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            CloudPreset(
+                id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                name = obj.optString("name", ""),
+                model = obj.optString("model", ""),
+                prompt = obj.optString("prompt", "")
+            )
+        }
+    } catch (_: Exception) { emptyList() }
+}
+
+private fun presetsToJson(presets: List<CloudPreset>): String {
+    val arr = org.json.JSONArray()
+    for (p in presets) {
+        val obj = org.json.JSONObject()
+        obj.put("id", p.id)
+        obj.put("name", p.name)
+        obj.put("model", p.model)
+        obj.put("prompt", p.prompt)
+        arr.put(obj)
+    }
+    return arr.toString()
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+@Composable
+private fun brandOutlinedTextFieldColors(teal: Color) =
+    androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = teal,
+        focusedLabelColor = teal,
+        cursorColor = teal
+    )
+
+private fun getFileName(context: Context, uri: Uri): String? {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            return cursor.getString(0)
+        }
+    }
+    return uri.lastPathSegment
+}
+
+private sealed class ConnectionStatus {
+    object Idle : ConnectionStatus()
+    object Connecting : ConnectionStatus()
+    data class Connected(val modelCount: Int, val details: String? = null) : ConnectionStatus()
+    data class Failed(val error: String) : ConnectionStatus()
+}
+
+fun createAISettings(context: Context) = listOf(
+    Setting(context, Settings.PREF_AI_BACKEND, R.string.ai_backend, R.string.ai_backend_summary) { setting ->
+        ListPreference(
+            setting,
+            listOf("Gemini (cloud)" to "gemini", "Ollama (local)" to "ollama"),
+            Defaults.PREF_AI_BACKEND
+        )
+    },
+    Setting(context, Settings.PREF_GEMINI_API_KEY, R.string.gemini_api_key) { setting ->
+        SecureTextInputPreference(setting, Defaults.PREF_GEMINI_API_KEY)
+    },
+    Setting(context, Settings.PREF_GROQ_API_KEY, R.string.groq_api_key) { setting ->
+        SecureTextInputPreference(setting, Defaults.PREF_GROQ_API_KEY)
+    },
+    Setting(context, Settings.PREF_OPENROUTER_API_KEY, R.string.openrouter_api_key) { setting ->
+        SecureTextInputPreference(setting, Defaults.PREF_OPENROUTER_API_KEY)
+    },
+    Setting(context, Settings.PREF_ANTHROPIC_API_KEY, R.string.anthropic_api_key) { setting ->
+        SecureTextInputPreference(setting, Defaults.PREF_ANTHROPIC_API_KEY)
+    },
+    Setting(context, Settings.PREF_OPENAI_API_KEY, R.string.openai_api_key) { setting ->
+        SecureTextInputPreference(setting, Defaults.PREF_OPENAI_API_KEY)
+    },
+    Setting(context, Settings.PREF_BRAVE_SEARCH_API_KEY, R.string.brave_search_api_key) { setting ->
+        SecureTextInputPreference(setting, Defaults.PREF_BRAVE_SEARCH_API_KEY)
+    },
+    Setting(context, Settings.PREF_TAVILY_API_KEY, R.string.tavily_api_key) { setting ->
+        SecureTextInputPreference(setting, Defaults.PREF_TAVILY_API_KEY)
+    },
+    Setting(context, Settings.PREF_OLLAMA_URL, R.string.ollama_url) { setting ->
+        TextInputPreference(setting, Defaults.PREF_OLLAMA_URL)
+    },
+    Setting(context, Settings.PREF_OLLAMA_MODEL, R.string.ollama_model) { setting ->
+        TextInputPreference(setting, Defaults.PREF_OLLAMA_MODEL)
+    },
+    Setting(context, Settings.PREF_AI_INSTRUCTION, R.string.ai_instruction_label, R.string.ai_instruction_summary) { setting ->
+        TextInputPreference(setting, Defaults.PREF_AI_INSTRUCTION)
+    },
+    Setting(context, Settings.PREF_AI_LOREBOOK, R.string.ai_lorebook_label, R.string.ai_lorebook_summary) { setting ->
+        TextInputPreference(setting, Defaults.PREF_AI_LOREBOOK)
+    },
+)
+
+@Composable
+private fun McpServersSection(
+    prefs: android.content.SharedPreferences,
+    teal: Color
+) {
+    // Local state: re-read on each edit via a counter
+    var reloadCounter by remember { mutableStateOf(0) }
+    val servers = remember(reloadCounter) {
+        helium314.keyboard.latin.ai.McpRegistry.listAllServers(prefs)
+    }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editingServer by remember { mutableStateOf<helium314.keyboard.latin.ai.McpRegistry.McpServer?>(null) }
+
+    Text(
+        "MCP Servers",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = teal,
+        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 4.dp)
+    )
+    Text(
+        "Model Context Protocol servers expose extra tools (Home Assistant, filesystem, etc.) to the AI. Tools are listed at the start of each chat turn.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+
+    for (server in servers) {
+        BrandCard {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            server.name,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = teal,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            server.url,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            if (server.transport == helium314.keyboard.latin.ai.McpRegistry.TRANSPORT_SSE)
+                                "Legacy SSE" else "Streamable HTTP",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = server.enabled,
+                        onCheckedChange = { enabled ->
+                            helium314.keyboard.latin.ai.McpRegistry.setEnabled(prefs, server.id, enabled)
+                            reloadCounter++
+                        }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                ) {
+                    OutlinedButton(
+                        onClick = { editingServer = server },
+                        colors = brandOutlinedButtonColors(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Edit", style = MaterialTheme.typography.labelSmall) }
+                    OutlinedButton(
+                        onClick = {
+                            helium314.keyboard.latin.ai.McpRegistry.removeServer(prefs, server.id)
+                            reloadCounter++
+                        },
+                        colors = brandOutlinedButtonColors(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Remove", style = MaterialTheme.typography.labelSmall) }
+                }
+            }
+        }
+    }
+
+    BrandCard {
+        Button(
+            onClick = { showAddDialog = true },
+            colors = brandButtonColors(),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("+ Add MCP server", style = MaterialTheme.typography.labelSmall) }
+    }
+
+    if (showAddDialog || editingServer != null) {
+        val existing = editingServer
+        var name by remember(existing?.id) { mutableStateOf(existing?.name ?: "") }
+        var url by remember(existing?.id) { mutableStateOf(existing?.url ?: "") }
+        var token by remember(existing?.id) { mutableStateOf(existing?.token ?: "") }
+        var transport by remember(existing?.id) {
+            mutableStateOf(existing?.transport ?: helium314.keyboard.latin.ai.McpRegistry.TRANSPORT_STREAMABLE)
+        }
+
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = {
+                showAddDialog = false
+                editingServer = null
+            },
+            title = { Text(if (existing != null) "Edit MCP server" else "Add MCP server") },
+            text = {
+                Column {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Name") },
+                        placeholder = { Text("e.g. Home Assistant") },
+                        singleLine = true,
+                        colors = brandOutlinedTextFieldColors(teal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it },
+                        label = { Text("URL") },
+                        placeholder = { Text("http://192.168.1.10:3000/mcp") },
+                        singleLine = true,
+                        colors = brandOutlinedTextFieldColors(teal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = token,
+                        onValueChange = { token = it },
+                        label = { Text("Bearer token (optional)") },
+                        singleLine = true,
+                        colors = brandOutlinedTextFieldColors(teal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Transport",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        androidx.compose.material3.FilterChip(
+                            selected = transport == helium314.keyboard.latin.ai.McpRegistry.TRANSPORT_STREAMABLE,
+                            onClick = { transport = helium314.keyboard.latin.ai.McpRegistry.TRANSPORT_STREAMABLE },
+                            label = { Text("Streamable HTTP", color = MaterialTheme.colorScheme.onSurface) }
+                        )
+                        androidx.compose.material3.FilterChip(
+                            selected = transport == helium314.keyboard.latin.ai.McpRegistry.TRANSPORT_SSE,
+                            onClick = { transport = helium314.keyboard.latin.ai.McpRegistry.TRANSPORT_SSE },
+                            label = { Text("Legacy SSE", color = MaterialTheme.colorScheme.onSurface) }
+                        )
+                    }
+                    Text(
+                        "Streamable HTTP is the modern transport (spec 2025-03-26). Use Legacy SSE for older servers like Home Assistant's native MCP Server integration.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (name.isNotBlank() && url.isNotBlank()) {
+                            if (existing != null) {
+                                helium314.keyboard.latin.ai.McpRegistry.updateServer(
+                                    prefs,
+                                    existing.copy(
+                                        name = name.trim(),
+                                        url = url.trim(),
+                                        token = token.trim(),
+                                        transport = transport
+                                    )
+                                )
+                            } else {
+                                helium314.keyboard.latin.ai.McpRegistry.addServer(
+                                    prefs, name.trim(), url.trim(), token.trim(),
+                                    enabled = true, transport = transport
+                                )
+                            }
+                            reloadCounter++
+                            showAddDialog = false
+                            editingServer = null
+                        }
+                    },
+                    colors = brandButtonColors()
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showAddDialog = false
+                        editingServer = null
+                    },
+                    colors = brandOutlinedButtonColors()
+                ) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun Preview() {
+    initPreview(LocalContext.current)
+    Theme(previewDark) {
+        Surface {
+            AISettingsScreen(onClickBack = {}, onClickModelWizard = {})
+        }
+    }
+}

@@ -1,0 +1,17 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Static shortcuts: always available on long-press of app icon.
+         Dynamic shortcuts (presets, last chat) are managed by DeskdropShortcutManager. -->
+    <shortcut
+        android:shortcutId="new_chat"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_chat"
+        android:shortcutShortLabel="@string/shortcut_new_chat"
+        android:shortcutLongLabel="@string/shortcut_new_chat">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="helium314.keyboard"
+            android:targetClass="helium314.keyboard.latin.ai.ConversationActivity">
+            <extra android:name="launch_action" android:value="new_chat" />
+        </intent>
+    </shortcut>
+</shortcuts>

@@ -5,6 +5,8 @@
  */
 package helium314.keyboard.latin.suggestions
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
@@ -132,6 +134,19 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         LinearLayout.LayoutParams.MATCH_PARENT
     )
 
+    private val aiProgressBar: android.widget.ProgressBar = android.widget.ProgressBar(
+        context, null, android.R.attr.progressBarStyleHorizontal
+    ).apply {
+        isIndeterminate = true
+        val tealColor = 0xFF1A9E8F.toInt()
+        indeterminateTintList = android.content.res.ColorStateList.valueOf(tealColor)
+        val barHeight = (10f * resources.displayMetrics.density).toInt()
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, barHeight).apply {
+            addRule(ALIGN_PARENT_TOP)
+        }
+        visibility = GONE
+    }
+
     init {
         val colors = Settings.getValues().mColors
 
@@ -162,6 +177,15 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                 val button = createToolbarKey(context, key)
                 button.layoutParams = toolbarKeyLayoutParams
                 setupKey(button, colors)
+                if (key in listOf(ToolbarKey.AI_ASSIST, ToolbarKey.AI_CLIPBOARD, ToolbarKey.AI_SLOT_1, ToolbarKey.AI_SLOT_2, ToolbarKey.AI_SLOT_3, ToolbarKey.AI_SLOT_4, ToolbarKey.AI_VOICE, ToolbarKey.AI_CONVERSATION, ToolbarKey.AI_ACTIONS)) {
+                    button.drawable?.let {
+                        androidx.core.graphics.drawable.DrawableCompat.setTintList(it, null)
+                        it.clearColorFilter()
+                    }
+                    button.clearColorFilter()
+                }
+                helium314.keyboard.latin.utils.applyReminderAccentIfNeeded(context, button)
+                helium314.keyboard.latin.utils.applyCloudFallbackBadge(context, button)
                 toolbar.addView(button)
             }
         }
@@ -170,6 +194,15 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                 val button = createToolbarKey(context, pinnedKey)
                 button.layoutParams = toolbarKeyLayoutParams
                 setupKey(button, colors)
+                if (pinnedKey in listOf(ToolbarKey.AI_ASSIST, ToolbarKey.AI_CLIPBOARD, ToolbarKey.AI_SLOT_1, ToolbarKey.AI_SLOT_2, ToolbarKey.AI_SLOT_3, ToolbarKey.AI_SLOT_4, ToolbarKey.AI_VOICE, ToolbarKey.AI_CONVERSATION, ToolbarKey.AI_ACTIONS)) {
+                    button.drawable?.let {
+                        androidx.core.graphics.drawable.DrawableCompat.setTintList(it, null)
+                        it.clearColorFilter()
+                    }
+                    button.clearColorFilter()
+                }
+                helium314.keyboard.latin.utils.applyReminderAccentIfNeeded(context, button)
+                helium314.keyboard.latin.utils.applyCloudFallbackBadge(context, button)
                 pinnedKeys.addView(button)
                 val pinnedKeyInToolbar = toolbar.findViewWithTag<View>(pinnedKey)
                 if (pinnedKeyInToolbar != null && Settings.getValues().mQuickPinToolbarKeys)
@@ -178,6 +211,9 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
 
         updateKeys()
+
+        // Add thin AI progress bar overlay at top of strip
+        addView(aiProgressBar)
     }
 
     private lateinit var listener: Listener
@@ -213,6 +249,38 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         listener = newListener
         moreSuggestionsView.listener = newListener
         moreSuggestionsView.mainKeyboardView = inputView.findViewById(R.id.keyboard_view)
+        // Re-evaluate reminder accent on every keyboard show — init {} only runs
+        // once per view lifetime, so unread reminders that fire while the
+        // keyboard is hidden wouldn't otherwise update the tint.
+        refreshReminderAccent()
+    }
+
+    /**
+     * Re-apply the reminder accent tint to any AI_CONVERSATION buttons in the
+     * current toolbar / pinned strip. Cheap — reads one JSON file.
+     */
+    fun refreshReminderAccent() {
+        // Only AI_CONVERSATION carries the dot badge; just re-apply on both groups.
+        for (group in listOf(toolbar, pinnedKeys)) {
+            for (i in 0 until group.childCount) {
+                val child = group.getChildAt(i)
+                if (child is android.widget.ImageButton && child.tag == ToolbarKey.AI_CONVERSATION) {
+                    helium314.keyboard.latin.utils.applyReminderAccentIfNeeded(context, child)
+                }
+            }
+        }
+    }
+
+    /** Re-apply cloud fallback red dot badges on AI slot/voice/assist keys. */
+    fun refreshCloudFallbackBadges() {
+        for (group in listOf(toolbar, pinnedKeys)) {
+            for (i in 0 until group.childCount) {
+                val child = group.getChildAt(i)
+                if (child is android.widget.ImageButton) {
+                    helium314.keyboard.latin.utils.applyCloudFallbackBadge(context, child)
+                }
+            }
+        }
     }
 
     fun setRtl(isRtlLanguage: Boolean) {
@@ -371,6 +439,28 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     private fun onLongClickToolbarKey(view: View) {
         val tag = view.tag as? ToolbarKey ?: return
+        android.util.Log.d("SuggestionStrip", "onLongClickToolbarKey: tag=$tag, parent=${if (view.parent === toolbar) "toolbar" else if (view.parent === pinnedKeys) "pinned" else "other"}")
+        // AI Assist: long-press opens instruction editor
+        if (tag == ToolbarKey.AI_ASSIST) {
+            (listener as? helium314.keyboard.latin.LatinIME)?.showAiInstructionDialog()
+            return
+        }
+        // AI Voice: long-press opens mode selector
+        if (tag == ToolbarKey.AI_VOICE) {
+            (listener as? helium314.keyboard.latin.LatinIME)?.showAiVoiceModeDialog()
+            return
+        }
+        // AI Conversation: long-press offers bulk-clear of unread reminders
+        if (tag == ToolbarKey.AI_CONVERSATION) {
+            (listener as? helium314.keyboard.latin.LatinIME)?.showMarkAllRemindersReadDialog()
+            return
+        }
+        // AI Slots: long-press opens config dialog
+        if (tag in listOf(ToolbarKey.AI_SLOT_1, ToolbarKey.AI_SLOT_2, ToolbarKey.AI_SLOT_3, ToolbarKey.AI_SLOT_4)) {
+            val slotNumber = tag.name.last().digitToInt()
+            (listener as? helium314.keyboard.latin.LatinIME)?.showSlotConfigDialog(slotNumber)
+            return
+        }
         if (!Settings.getValues().mQuickPinToolbarKeys || view.parent === pinnedKeys) {
             val longClickCode = getCodeForToolbarKeyLongClick(tag)
             if (longClickCode != KeyCode.UNSPECIFIED) {
@@ -510,6 +600,112 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val show = Settings.getValues().mShowsVoiceInputKey
         toolbar.findViewWithTag<View>(ToolbarKey.VOICE)?.isVisible = show
         pinnedKeys.findViewWithTag<View>(ToolbarKey.VOICE)?.isVisible = show
+    }
+
+    private var aiPulseAnimator: ObjectAnimator? = null
+    private var aiUndoKey: ToolbarKey? = null
+    private var aiOriginalDrawable: android.graphics.drawable.Drawable? = null
+    private var aiVoiceOriginalDrawable: android.graphics.drawable.Drawable? = null
+    private var inlineInstructionGlow: ObjectAnimator? = null
+
+    fun setInlineInstructionMode(active: Boolean) {
+        val button = pinnedKeys.findViewWithTag<View>(ToolbarKey.AI_ASSIST)
+            ?: toolbar.findViewWithTag<View>(ToolbarKey.AI_ASSIST)
+            ?: return
+        val imageButton = button as? android.widget.ImageButton ?: return
+
+        if (active) {
+            if (inlineInstructionGlow == null) {
+                inlineInstructionGlow = ObjectAnimator.ofFloat(button, "alpha", 1f, 0.2f).apply {
+                    duration = 600
+                    repeatMode = ValueAnimator.REVERSE
+                    repeatCount = ValueAnimator.INFINITE
+                    start()
+                }
+            }
+        } else {
+            inlineInstructionGlow?.cancel()
+            inlineInstructionGlow = null
+            button.alpha = 1f
+        }
+    }
+
+    fun setAiUndoAvailable(available: Boolean, key: ToolbarKey) {
+        // Clear previous undo button if switching to a different key
+        if (available && aiUndoKey != null && aiUndoKey != key) {
+            setAiUndoAvailable(false, aiUndoKey!!)
+        }
+
+        val button = pinnedKeys.findViewWithTag<View>(key)
+            ?: toolbar.findViewWithTag<View>(key)
+            ?: return
+        val imageButton = button as? android.widget.ImageButton ?: return
+
+        if (available) {
+            if (aiUndoKey != key) {
+                aiOriginalDrawable = imageButton.drawable
+            }
+            aiUndoKey = key
+            imageButton.setImageDrawable(
+                KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.UNDO.name, context)
+            )
+        } else {
+            if (aiOriginalDrawable != null && aiUndoKey == key) {
+                imageButton.setImageDrawable(aiOriginalDrawable)
+                aiOriginalDrawable = null
+            }
+            if (aiUndoKey == key) aiUndoKey = null
+        }
+    }
+
+    fun setAiProcessing(processing: Boolean, triggerKey: ToolbarKey?) {
+        // Global thin progress bar at top, regardless of which AI button was the trigger
+        aiProgressBar.visibility = if (processing) VISIBLE else GONE
+
+        // Note: haptic is fired in LatinIME.setAiProcessing*/setAiProcessingForKey,
+        // before the mSuggestionStripView null check, so it works even when the
+        // keyboard is hidden (e.g. clipboard dialog/activity flow).
+
+        val key = triggerKey ?: ToolbarKey.AI_ASSIST
+        val button = pinnedKeys.findViewWithTag<View>(key)
+            ?: toolbar.findViewWithTag<View>(key)
+            ?: return
+
+        if (processing) {
+            aiPulseAnimator?.cancel()
+            aiPulseAnimator = ObjectAnimator.ofFloat(button, "alpha", 1f, 0.2f).apply {
+                duration = 600
+                repeatMode = ValueAnimator.REVERSE
+                repeatCount = ValueAnimator.INFINITE
+                start()
+            }
+        } else {
+            aiPulseAnimator?.cancel()
+            aiPulseAnimator = null
+            button.alpha = 1f
+        }
+    }
+
+    /**
+     * Toggle the AI_VOICE button between mic icon and REC icon (no pulse).
+     * Used for the "actively recording audio" state, distinct from transcribing.
+     */
+    fun setAiVoiceRecording(recording: Boolean) {
+        val button = pinnedKeys.findViewWithTag<View>(ToolbarKey.AI_VOICE)
+            ?: toolbar.findViewWithTag<View>(ToolbarKey.AI_VOICE)
+            ?: return
+        val imageButton = button as? android.widget.ImageButton ?: return
+        if (recording) {
+            if (aiVoiceOriginalDrawable == null) {
+                aiVoiceOriginalDrawable = imageButton.drawable
+            }
+            imageButton.setImageResource(helium314.keyboard.latin.R.drawable.ic_ai_voice_rec)
+        } else {
+            if (aiVoiceOriginalDrawable != null) {
+                imageButton.setImageDrawable(aiVoiceOriginalDrawable)
+                aiVoiceOriginalDrawable = null
+            }
+        }
     }
 
     private fun updateKeys() {

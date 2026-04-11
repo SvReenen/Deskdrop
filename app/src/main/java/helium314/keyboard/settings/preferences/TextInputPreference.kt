@@ -15,6 +15,29 @@ import helium314.keyboard.settings.dialogs.TextInputDialog
 import androidx.core.content.edit
 
 @Composable
+fun SecureTextInputPreference(setting: Setting, default: String, info: String? = null) {
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    val currentValue = helium314.keyboard.latin.ai.SecureApiKeys.getKey(setting.key)
+    Preference(
+        name = setting.title,
+        onClick = { showDialog = true },
+        description = currentValue.takeIf { it.isNotEmpty() }?.let { "••••••••" + it.takeLast(4) }
+    )
+    if (showDialog) {
+        TextInputDialog(
+            onDismissRequest = { showDialog = false },
+            onConfirmed = {
+                helium314.keyboard.latin.ai.SecureApiKeys.setKey(setting.key, it)
+                KeyboardSwitcher.getInstance().setThemeNeedsReload()
+            },
+            initialText = currentValue,
+            title = { Text(setting.title) },
+            description = if (info == null) null else { { Text(info) } },
+        )
+    }
+}
+
+@Composable
 fun TextInputPreference(setting: Setting, default: String, info: String? = null, checkTextValid: (String) -> Boolean = { true }) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     val prefs = LocalContext.current.prefs()

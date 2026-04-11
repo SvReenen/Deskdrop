@@ -3,14 +3,21 @@ package helium314.keyboard.latin.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Canvas
+import android.graphics.ColorFilter
+import android.graphics.Paint
+import android.graphics.PixelFormat
+import android.graphics.drawable.Drawable
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.view.forEach
 import helium314.keyboard.keyboard.internal.KeyboardIconsSet
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.R
+import helium314.keyboard.latin.ai.ReminderStore
 import helium314.keyboard.latin.common.Constants.Separators
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
@@ -31,11 +38,121 @@ fun createToolbarKey(context: Context, key: ToolbarKey): ImageButton {
     return button
 }
 
+/**
+ * Drawable wrapper that renders [base] plus a small coloured dot in the
+ * top-right corner when [showDot] is true. Used to badge the
+ * AI_CONVERSATION toolbar button when there are unread reminders.
+ */
+class DotBadgeDrawable(
+    private val base: Drawable,
+    dotColor: Int,
+    private val dotRadiusPx: Float,
+    private val marginPx: Float
+) : Drawable() {
+
+    var showDot: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateSelf()
+            }
+        }
+
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = dotColor }
+
+    override fun draw(canvas: Canvas) {
+        base.draw(canvas)
+        if (!showDot) return
+        val b = bounds
+        val cx = b.right - dotRadiusPx - marginPx
+        val cy = b.top + dotRadiusPx + marginPx
+        canvas.drawCircle(cx, cy, dotRadiusPx, paint)
+    }
+
+    override fun onBoundsChange(bounds: android.graphics.Rect) {
+        super.onBoundsChange(bounds)
+        base.bounds = bounds
+    }
+
+    override fun getIntrinsicWidth() = base.intrinsicWidth
+    override fun getIntrinsicHeight() = base.intrinsicHeight
+
+    override fun setAlpha(alpha: Int) {
+        base.alpha = alpha
+        paint.alpha = alpha
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        base.colorFilter = colorFilter
+    }
+
+    @Suppress("DEPRECATION")
+    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+}
+
+/**
+ * Badge the AI_CONVERSATION button with a small orange dot in the top-right
+ * corner when there are unread reminders. First call wraps the button's
+ * drawable in a [DotBadgeDrawable]; subsequent calls just flip the dot
+ * visibility so the wrapper persists across refreshes.
+ */
+fun applyReminderAccentIfNeeded(context: Context, button: ImageButton) {
+    if (button.tag != AI_CONVERSATION) return
+    val current = button.drawable ?: return
+    try {
+        val wrapper: DotBadgeDrawable = if (current is DotBadgeDrawable) {
+            current
+        } else {
+            val density = context.resources.displayMetrics.density
+            val w = DotBadgeDrawable(
+                base = current,
+                dotColor = ContextCompat.getColor(context, R.color.reminder_accent),
+                dotRadiusPx = 3.5f * density,
+                marginPx = 1f * density
+            )
+            button.setImageDrawable(w)
+            w
+        }
+        wrapper.showDot = ReminderStore.hasUnread(context)
+        button.invalidate()
+    } catch (_: Exception) { /* best-effort badge */ }
+}
+
+/**
+ * Badge AI slot keys with a red dot when cloud fallback is active,
+ * indicating the configured local model has been replaced by a cloud model.
+ */
+fun applyCloudFallbackBadge(context: Context, button: ImageButton) {
+    val tag = button.tag as? ToolbarKey ?: return
+    if (tag !in listOf(AI_SLOT_1, AI_SLOT_2, AI_SLOT_3, AI_SLOT_4, AI_ASSIST, AI_VOICE)) return
+    val current = button.drawable ?: return
+    try {
+        val prefs = context.prefs()
+        val fallbackActive = helium314.keyboard.latin.ai.AiServiceSync.isCloudFallbackActive(prefs)
+        val wrapper: DotBadgeDrawable = if (current is DotBadgeDrawable) {
+            current
+        } else {
+            val density = context.resources.displayMetrics.density
+            val w = DotBadgeDrawable(
+                base = current,
+                dotColor = 0xFFE53935.toInt(), // red
+                dotRadiusPx = 3.5f * density,
+                marginPx = 1f * density
+            )
+            button.setImageDrawable(w)
+            w
+        }
+        wrapper.showDot = fallbackActive
+        button.invalidate()
+    } catch (_: Exception) { /* best-effort badge */ }
+}
+
 fun setToolbarButtonsActivatedStateOnPrefChange(buttonsGroup: ViewGroup, key: String?) {
     // settings need to be updated when buttons change
     if (key != Settings.PREF_AUTO_CORRECTION
         && key != Settings.PREF_ALWAYS_INCOGNITO_MODE
-        && key?.startsWith(Settings.PREF_ONE_HANDED_MODE_PREFIX) == false)
+        && key?.startsWith(Settings.PREF_ONE_HANDED_MODE_PREFIX) == false
+        && key?.startsWith("ai_slot_") == false)
         return
 
     GlobalScope.launch {
@@ -50,6 +167,11 @@ private fun setToolbarButtonActivatedState(button: ImageButton) {
         ONE_HANDED -> Settings.getValues().mOneHandedModeEnabled
         SPLIT -> Settings.getValues().mIsSplitKeyboardEnabled
         AUTOCORRECT -> Settings.getValues().mAutoCorrectionEnabledPerUserSettings
+        AI_SLOT_1, AI_SLOT_2, AI_SLOT_3, AI_SLOT_4 -> {
+            val slotNum = (button.tag as ToolbarKey).name.last().digitToInt()
+            val model = button.context.prefs().getString("ai_slot_${slotNum}_model", "")
+            !model.isNullOrEmpty()
+        }
         else -> true
     }
 }
@@ -85,6 +207,15 @@ fun getCodeForToolbarKey(key: ToolbarKey) = Settings.getInstance().getCustomTool
     PAGE_START -> KeyCode.MOVE_START_OF_PAGE
     PAGE_END -> KeyCode.MOVE_END_OF_PAGE
     SPLIT -> KeyCode.SPLIT_LAYOUT
+    AI_ASSIST -> KeyCode.AI_ASSIST
+    AI_CLIPBOARD -> KeyCode.AI_CLIPBOARD
+    AI_SLOT_1 -> KeyCode.AI_SLOT_1
+    AI_SLOT_2 -> KeyCode.AI_SLOT_2
+    AI_SLOT_3 -> KeyCode.AI_SLOT_3
+    AI_SLOT_4 -> KeyCode.AI_SLOT_4
+    AI_VOICE -> KeyCode.AI_VOICE
+    AI_CONVERSATION -> KeyCode.AI_CONVERSATION
+    AI_ACTIONS -> KeyCode.AI_ACTIONS
 }
 
 fun getCodeForToolbarKeyLongClick(key: ToolbarKey) = Settings.getInstance().getCustomToolbarLongpressCode(key) ?: when (key) {
@@ -110,7 +241,16 @@ fun getCodeForToolbarKeyLongClick(key: ToolbarKey) = Settings.getInstance().getC
 enum class ToolbarKey {
     VOICE, CLIPBOARD, NUMPAD, UNDO, REDO, SETTINGS, SELECT_ALL, SELECT_WORD, COPY, CUT, PASTE, ONE_HANDED, SPLIT,
     INCOGNITO, AUTOCORRECT, CLEAR_CLIPBOARD, CLOSE_HISTORY, EMOJI, LEFT, RIGHT, UP, DOWN, WORD_LEFT, WORD_RIGHT,
-    PAGE_UP, PAGE_DOWN, FULL_LEFT, FULL_RIGHT, PAGE_START, PAGE_END
+    PAGE_UP, PAGE_DOWN, FULL_LEFT, FULL_RIGHT, PAGE_START, PAGE_END,
+    AI_ASSIST,
+    AI_CLIPBOARD,
+    AI_SLOT_1,
+    AI_SLOT_2,
+    AI_SLOT_3,
+    AI_SLOT_4,
+    AI_VOICE,
+    AI_CONVERSATION,
+    AI_ACTIONS
 }
 
 enum class ToolbarMode {
@@ -120,14 +260,15 @@ enum class ToolbarMode {
 val toolbarKeyStrings = entries.associateWithTo(EnumMap(ToolbarKey::class.java)) { it.toString().lowercase(Locale.US) }
 
 val defaultToolbarPref by lazy {
-    val default = listOf(SETTINGS, VOICE, CLIPBOARD, UNDO, REDO, SELECT_WORD, COPY, PASTE, LEFT, RIGHT)
+    val default = listOf(AI_ASSIST, AI_VOICE, SETTINGS, VOICE, CLIPBOARD, UNDO, REDO, SELECT_WORD, COPY, PASTE, LEFT, RIGHT)
     val others = entries.filterNot { it in default || it == CLOSE_HISTORY }
     default.joinToString(Separators.ENTRY) { it.name + Separators.KV + true } + Separators.ENTRY +
             others.joinToString(Separators.ENTRY) { it.name + Separators.KV + false }
 }
 
+private val defaultPinnedKeys = setOf(AI_ASSIST, AI_CLIPBOARD, AI_SLOT_1, AI_SLOT_2, AI_VOICE, AI_CONVERSATION)
 val defaultPinnedToolbarPref = entries.filterNot { it == CLOSE_HISTORY }.joinToString(Separators.ENTRY) {
-    it.name + Separators.KV + false
+    it.name + Separators.KV + (it in defaultPinnedKeys)
 }
 
 val defaultClipboardToolbarPref by lazy {
@@ -142,6 +283,29 @@ fun upgradeToolbarPrefs(prefs: SharedPreferences) {
     upgradeToolbarPref(prefs, Settings.PREF_TOOLBAR_KEYS, defaultToolbarPref)
     upgradeToolbarPref(prefs, Settings.PREF_PINNED_TOOLBAR_KEYS, defaultPinnedToolbarPref)
     upgradeToolbarPref(prefs, Settings.PREF_CLIPBOARD_TOOLBAR_KEYS, defaultClipboardToolbarPref)
+    // Ensure AI keys are enabled and pinned for existing installs
+    for (key in defaultPinnedKeys) {
+        ensureKeyEnabled(prefs, key)
+        ensureKeyPinned(prefs, key)
+    }
+}
+
+private fun ensureKeyEnabled(prefs: SharedPreferences, key: ToolbarKey) {
+    val string = prefs.getString(Settings.PREF_TOOLBAR_KEYS, defaultToolbarPref) ?: return
+    if (string.contains(key.name + Separators.KV + "true")) return
+    val result = string.split(Separators.ENTRY).joinToString(Separators.ENTRY) {
+        if (it.startsWith(key.name + Separators.KV)) key.name + Separators.KV + "true" else it
+    }
+    prefs.edit { putString(Settings.PREF_TOOLBAR_KEYS, result) }
+}
+
+private fun ensureKeyPinned(prefs: SharedPreferences, key: ToolbarKey) {
+    val string = prefs.getString(Settings.PREF_PINNED_TOOLBAR_KEYS, defaultPinnedToolbarPref) ?: return
+    if (string.contains(key.name + Separators.KV + "true")) return
+    val result = string.split(Separators.ENTRY).joinToString(Separators.ENTRY) {
+        if (it.startsWith(key.name + Separators.KV)) key.name + Separators.KV + "true" else it
+    }
+    prefs.edit { putString(Settings.PREF_PINNED_TOOLBAR_KEYS, result) }
 }
 
 private fun upgradeToolbarPref(prefs: SharedPreferences, pref: String, default: String) {

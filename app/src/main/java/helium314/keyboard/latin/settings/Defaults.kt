@@ -178,4 +178,58 @@ object Defaults {
     const val PREF_USER_MORE_COLORS = 0
     const val PREF_USER_ALL_COLORS = ""
     const val PREF_SAVE_SUBTYPE_PER_APP = false
+
+    // AI settings
+    const val PREF_AI_BACKEND = "gemini"
+    const val PREF_AI_MODEL = "gemini:gemini-2.5-flash"
+    const val PREF_AI_MODEL_FILTER = "both"
+    const val PREF_GEMINI_API_KEY = ""
+    const val PREF_GROQ_API_KEY = ""
+    const val PREF_OPENROUTER_API_KEY = ""
+    const val PREF_ANTHROPIC_API_KEY = ""
+    const val PREF_OPENAI_API_KEY = ""
+    const val PREF_BRAVE_SEARCH_API_KEY = ""
+    const val PREF_TAVILY_API_KEY = ""
+    const val PREF_OLLAMA_URL = "http://localhost:11434"
+    const val PREF_OLLAMA_URL_FALLBACK = ""
+    const val PREF_OLLAMA_MODEL = "gemma3:4b"
+    const val PREF_OPENAI_COMPAT_URL = ""
+    const val PREF_OPENAI_COMPAT_URL_FALLBACK = ""
+    const val PREF_OPENAI_COMPAT_API_KEY = ""
+    const val PREF_AI_INSTRUCTION = "Improve this text. Fix grammar and spelling. Keep the same language. Return only the improved text, nothing else."
+    const val PREF_AI_LOREBOOK = ""
+    const val PREF_AI_ALLOW_NETWORK_TOOLS = false
+    const val PREF_AI_ALLOW_ACTIONS = false
+    const val PREF_AI_INLINE_MODEL = "" // empty = use main AI model
+    const val PREF_AI_CONVERSATION_MODEL = "" // empty = use main AI model
+    const val PREF_AI_SLOT_1_MODEL = ""
+    const val PREF_AI_SLOT_2_MODEL = ""
+    const val PREF_AI_SLOT_3_MODEL = ""
+    const val PREF_AI_SLOT_4_MODEL = ""
+    const val PREF_AI_CLOUD_PRESETS = "[]"
+    const val PREF_AI_VOICE_MODE = 0
+    const val PREF_AI_VOICE_MODEL = "" // empty = use main AI model
+    const val PREF_AI_VOICE_CUSTOM_MODES = "[]" // JSON array of {name, prompt}
+    const val PREF_AI_VOICE_ENGINE = "google"
+    const val PREF_AI_MCP_MODEL = "" // empty = use main AI model
+    const val PREF_AI_CLOUD_FALLBACK = false
+
+    const val PREF_WHISPER_URL = ""
+    const val PREF_WHISPER_URL_FALLBACK = ""
+    const val PREF_WHISPER_MODEL = "Systran/faster-whisper-base"
+    const val PREF_DESKDROP_ONBOARDING_DONE = false
+
+    // Default voice mode prompts (used as fallback when no custom prompt is set)
+    val AI_VOICE_MODE_NAMES = arrayOf("Smart (auto-detect)", "Translate to English", "Translate to Dutch", "Formal", "Bullet points", "Chat message")
+    val AI_VOICE_MODE_PROMPTS = arrayOf(
+        "This is voice input from a user. Determine the intent:\n- If it sounds like dictated text (contains filler words, lacks structure), clean it up: fix punctuation, remove filler words, make it well-structured.\n- If it sounds like an instruction or request (e.g. 'write an email about...', 'summarize...', 'translate...'), follow the instruction and generate the requested content.\nKeep the same language as the input. Return only the final text, no explanations.",
+        "Translate this voice input to English. Return only the translated text.",
+        "Translate this voice input to Dutch. Return only the translated text.",
+        "Rewrite this voice input in a formal, professional tone. Fix punctuation and remove filler words. Keep the same language. Return only the formal text.",
+        "Convert this voice input into a clean bullet point list. Keep the same language. Return only the list.",
+        "Clean up this voice input into a natural chat message. Keep it short and conversational, like a WhatsApp text. Remove filler words (um, uh, like), fix punctuation, but do NOT make it formal or professional. Use the same language as the input. Add emoji only if the tone clearly calls for it. Return only the message, nothing else."
+    )
+
+    // Special reply-to-clipboard prompt (not a regular voice mode, triggered separately)
+    const val AI_VOICE_REPLY_PROMPT = "The user copied a message and then dictated a reply instruction via voice.\n\nCopied message (context):\n{clipboard}\n\nUser's voice instruction:\n{voice_input}\n\nWrite a natural reply to the copied message based on the user's instruction. Match the tone and language of the original message. Return only the reply, nothing else."
 }

@@ -136,6 +136,61 @@ public class LatinIME extends InputMethodService implements
     private InsetsOutlineProvider mInsetsUpdater;
     private SuggestionStripView mSuggestionStripView;
 
+    // Pending text to insert from ResultViewActivity
+    private static volatile String sPendingInsert = null;
+    private static volatile boolean sPendingReopenAiDialog = false;
+
+    public static void setPendingInsert(String text) {
+        sPendingInsert = text;
+    }
+
+    public static void setPendingReopenAiDialog() {
+        sPendingReopenAiDialog = true;
+    }
+
+    // Active dialog EditText for routing keyboard input to IME's own dialogs
+    private android.widget.EditText mDialogEditText = null;
+    private int mDialogCursorPos = 0;
+    private android.app.AlertDialog mActiveDialog = null;
+
+    public void setActiveDialog(android.app.AlertDialog dialog) {
+        mActiveDialog = dialog;
+    }
+
+    public android.app.AlertDialog getActiveDialog() {
+        return mActiveDialog;
+    }
+
+    public void setDialogEditText(android.widget.EditText editText) {
+        mDialogEditText = editText;
+        if (editText != null) {
+            mDialogCursorPos = editText.getText().length();
+            android.text.Selection.setSelection(editText.getText(), mDialogCursorPos);
+        }
+        // Force shift state refresh: unshift when dialog opens, re-evaluate when dialog closes
+        mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
+    public android.widget.EditText getDialogEditText() {
+        return mDialogEditText;
+    }
+
+    public int getDialogCursorPos() {
+        return mDialogCursorPos;
+    }
+
+    public void setDialogCursorPos(int pos) {
+        mDialogCursorPos = pos;
+        if (mDialogEditText != null) {
+            int clamped = Math.max(0, Math.min(pos, mDialogEditText.getText().length()));
+            mDialogCursorPos = clamped;
+            android.text.Selection.setSelection(mDialogEditText.getText(), clamped);
+        }
+    }
+
+    public KeyboardSwitcher getKeyboardSwitcher() { return mKeyboardSwitcher; }
+    public InputLogic getInputLogic() { return mInputLogic; }
+
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
     private final SubtypeState mSubtypeState = new SubtypeState((InputMethodSubtype subtype) -> { switchToSubtype(subtype); return Unit.INSTANCE; });
@@ -542,6 +597,10 @@ public class LatinIME extends InputMethodService implements
         super.onCreate();
 
         loadSettings();
+        helium314.keyboard.latin.ai.AiServiceSync.setContext(this);
+        helium314.keyboard.latin.ai.SecureApiKeys.init(this);
+        helium314.keyboard.latin.ai.SecureApiKeys.migrateFromPlainPrefs(
+            helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this));
         mClipboardHistoryManager.onCreate();
         mHandler.onCreate();
 
@@ -776,6 +835,32 @@ public class LatinIME extends InputMethodService implements
     public void onStartInputView(final EditorInfo editorInfo, final boolean restarting) {
         mHandler.onStartInputView(editorInfo, restarting);
         mStatsUtilsManager.onStartInputView();
+        // Re-evaluate reminder accent tint on every keyboard show —
+        // setListener() only runs on input-view (re)creation, so a reminder
+        // firing mid-session wouldn't otherwise refresh the AI_CONVERSATION
+        // button tint.
+        if (hasSuggestionStripView()) {
+            mSuggestionStripView.refreshReminderAccent();
+            mSuggestionStripView.refreshCloudFallbackBadges();
+        }
+        // Check for pending actions from ConversationActivity / ResultViewActivity.
+        // These may come from the :chat process via PendingInsertBridge (file-based IPC),
+        // or from the legacy in-process static fields (kept for backward compat until
+        // all callers are migrated).
+        String pending = helium314.keyboard.latin.ai.PendingInsertBridge.consumeInsert(this);
+        if (pending == null) {
+            // Fallback: check legacy static field (same-process callers)
+            pending = sPendingInsert;
+            sPendingInsert = null;
+        }
+        if (pending != null) {
+            final String text = pending;
+            mHandler.postDelayed(() -> mInputLogic.mConnection.commitText(text, 1), 100);
+        }
+        if (helium314.keyboard.latin.ai.PendingInsertBridge.consumeReopenFlag(this) || sPendingReopenAiDialog) {
+            sPendingReopenAiDialog = false;
+            mHandler.postDelayed(() -> showAiClipboardDialog(), 150);
+        }
     }
 
     @Override
@@ -896,6 +981,22 @@ public class LatinIME extends InputMethodService implements
         StatsUtils.onStartInputView(editorInfo.inputType,
                 Settings.getValues().mDisplayOrientation,
                 !isDifferentTextField);
+
+        // Proactively check cloud fallback on a background thread so model prefs
+        // are up-to-date before the user presses any shortcut key.
+        final android.content.SharedPreferences fallbackPrefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+        if (fallbackPrefs.getBoolean(Settings.PREF_AI_CLOUD_FALLBACK, helium314.keyboard.latin.settings.Defaults.PREF_AI_CLOUD_FALLBACK)) {
+            final LatinIME ime = this;
+            new Thread(() -> {
+                helium314.keyboard.latin.ai.AiServiceSync.checkCloudFallback(fallbackPrefs);
+                // Refresh toolbar badges on UI thread after probe completes
+                ime.mHandler.post(() -> {
+                    if (hasSuggestionStripView()) {
+                        mSuggestionStripView.refreshCloudFallbackBadges();
+                    }
+                });
+            }).start();
+        }
 
         // The EditorInfo might have a flag that affects fullscreen mode.
         // Note: This call should be done by InputMethodService?
@@ -1118,6 +1219,9 @@ public class LatinIME extends InputMethodService implements
             mOptionsDialog.dismiss();
             mOptionsDialog = null;
         }
+        if (mActiveDialog != null && mActiveDialog.isShowing()) {
+            mActiveDialog.dismiss();
+        }
         super.hideWindow();
     }
 
@@ -1338,6 +1442,470 @@ public class LatinIME extends InputMethodService implements
         launchSettings();
     }
 
+    public void setAiProcessing(boolean processing) {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setAiProcessing(processing, null);
+        }
+    }
+
+    public void setAiProcessing(boolean processing, int slotNumber) {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        if (mSuggestionStripView != null) {
+            helium314.keyboard.latin.utils.ToolbarKey key = slotNumber == 0
+                ? helium314.keyboard.latin.utils.ToolbarKey.AI_ASSIST
+                : helium314.keyboard.latin.utils.ToolbarKey.valueOf("AI_SLOT_" + slotNumber);
+            mSuggestionStripView.setAiProcessing(processing, key);
+        }
+    }
+
+    public void setAiProcessingForKey(boolean processing, helium314.keyboard.latin.utils.ToolbarKey key) {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setAiProcessing(processing, key);
+        }
+    }
+
+    private android.speech.SpeechRecognizer mSpeechRecognizer;
+    private helium314.keyboard.latin.ai.WhisperRecorder mWhisperRecorder;
+    private volatile boolean mWhisperTranscribing = false;
+    private volatile long mAiVoiceCancelGraceUntil = 0L;
+    private boolean mAiVoiceListening = false;
+    private boolean mAiVoiceLocaleRetry = false;
+    private android.os.Handler mAiVoiceWatchdogHandler;
+    private Runnable mAiVoiceWatchdogRunnable;
+
+    /**
+     * Show a voice error to the user. Tries Toast first, but ALSO commits an inline marker
+     * to the input field, because users can disable toasts for the keyboard package at the OS
+     * level (NotificationService "Suppressing toast ... by user request"), in which case Toast
+     * is the only feedback they would otherwise have.
+     */
+    private void showVoiceError(String msg) {
+        android.util.Log.e("LatinIME", "Voice error: " + msg);
+        try {
+            android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show();
+        } catch (Exception ignored) {}
+        try {
+            android.view.inputmethod.InputConnection ic = getCurrentInputConnection();
+            if (ic != null) {
+                ic.commitText("[voice: " + msg + "]", 1);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void cancelAiVoiceWatchdog() {
+        if (mAiVoiceWatchdogHandler != null && mAiVoiceWatchdogRunnable != null) {
+            mAiVoiceWatchdogHandler.removeCallbacks(mAiVoiceWatchdogRunnable);
+        }
+        mAiVoiceWatchdogRunnable = null;
+    }
+
+    private void armAiVoiceWatchdog(long timeoutMs) {
+        cancelAiVoiceWatchdog();
+        if (mAiVoiceWatchdogHandler == null) {
+            mAiVoiceWatchdogHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        }
+        mAiVoiceWatchdogRunnable = new Runnable() {
+            @Override public void run() {
+                // Fired only if neither onReadyForSpeech nor onError ever arrived.
+                android.util.Log.e("LatinIME", "AI voice watchdog fired - speech service unresponsive");
+                mAiVoiceListening = false;
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAiProcessing(false, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+                }
+                cleanupSpeechRecognizer();
+                showVoiceError("speech service unresponsive (no language pack? try Whisper)");
+            }
+        };
+        mAiVoiceWatchdogHandler.postDelayed(mAiVoiceWatchdogRunnable, timeoutMs);
+    }
+    public void showAiVoiceModeDialog() {
+        helium314.keyboard.latin.ai.AiDialogComponentsKt.showAiVoiceModeDialog(this);
+    }
+
+    public void showMarkAllRemindersReadDialog() {
+        helium314.keyboard.latin.ai.AiDialogComponentsKt.showMarkAllRemindersReadDialog(this);
+    }
+
+    public void refreshReminderAccent() {
+        try {
+            if (mSuggestionStripView != null) mSuggestionStripView.refreshReminderAccent();
+        } catch (Exception ignored) {}
+    }
+
+    public String getAiVoiceModeInstruction() {
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+
+        // Check if reply-to-clipboard mode was triggered
+        if (prefs.getBoolean("ai_voice_reply_mode", false)) {
+            prefs.edit().putBoolean("ai_voice_reply_mode", false).apply();
+            return helium314.keyboard.latin.settings.Defaults.AI_VOICE_REPLY_PROMPT;
+        }
+
+        final int mode = prefs.getInt(Settings.PREF_AI_VOICE_MODE, helium314.keyboard.latin.settings.Defaults.PREF_AI_VOICE_MODE);
+        final String[] defaultPrompts = helium314.keyboard.latin.settings.Defaults.INSTANCE.getAI_VOICE_MODE_PROMPTS();
+        final int builtinCount = defaultPrompts.length;
+
+        if (mode < builtinCount) {
+            String custom = prefs.getString("ai_voice_prompt_" + mode, null);
+            if (custom != null && !custom.isEmpty()) return custom;
+            return defaultPrompts[mode];
+        } else {
+            // Custom mode
+            try {
+                org.json.JSONArray arr = new org.json.JSONArray(prefs.getString(Settings.PREF_AI_VOICE_CUSTOM_MODES, "[]"));
+                int ci = mode - builtinCount;
+                if (ci < arr.length()) {
+                    return arr.getJSONObject(ci).getString("prompt");
+                }
+            } catch (org.json.JSONException ignored) {}
+            return defaultPrompts[0];
+        }
+    }
+
+    public String getAiVoiceModel() {
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+        helium314.keyboard.latin.ai.AiServiceSync.checkCloudFallback(prefs);
+        String voiceModel = prefs.getString(Settings.PREF_AI_VOICE_MODEL, "");
+        if (voiceModel == null || voiceModel.isEmpty()) {
+            return prefs.getString(Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        }
+        return voiceModel;
+    }
+
+    public void startAiVoiceRecognition() {
+        android.util.Log.d("LatinIME", "startAiVoiceRecognition: mWhisperRecorder=" + mWhisperRecorder + ", mAiVoiceListening=" + mAiVoiceListening + ", mWhisperTranscribing=" + mWhisperTranscribing);
+
+        // Active Whisper recording → stop and transcribe (always highest priority,
+        // recording finish must never be intercepted by a cancel-check).
+        if (mWhisperRecorder != null) {
+            android.util.Log.d("LatinIME", "Whisper recorder exists, stopping and transcribing");
+            stopWhisperAndTranscribe();
+            return;
+        }
+
+        // Google SpeechRecognizer stop check
+        if (mAiVoiceListening) {
+            stopAiVoiceRecognition();
+            return;
+        }
+
+        // Hard cancel: if an AI_VOICE call (transcribe or post-AI) is in flight, cancel it.
+        // Grace period after recording-stop prevents accidental double-tap from cancelling.
+        if (helium314.keyboard.latin.ai.AiCancelRegistry.getActiveKey()
+                == helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE) {
+            if (android.os.SystemClock.uptimeMillis() < mAiVoiceCancelGraceUntil) {
+                android.util.Log.d("LatinIME", "AI_VOICE tap within grace period, ignoring");
+                return;
+            }
+            helium314.keyboard.latin.ai.AiCancelRegistry.cancel();
+            return;
+        }
+
+        // Block taps while Whisper transcription is in progress (defensive)
+        if (mWhisperTranscribing) {
+            android.util.Log.d("LatinIME", "Whisper transcribing, ignoring tap");
+            return;
+        }
+
+        // START new recording based on engine preference
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+        final String engine = prefs.getString(Settings.PREF_AI_VOICE_ENGINE, helium314.keyboard.latin.settings.Defaults.PREF_AI_VOICE_ENGINE);
+        android.util.Log.d("LatinIME", "Starting voice recognition, engine=" + engine);
+
+        if ("whisper".equals(engine)) {
+            startWhisperRecording();
+            return;
+        }
+
+        // Check permission
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                try {
+                    android.content.Intent intent = new android.content.Intent(this, helium314.keyboard.latin.ai.VoiceTrampolineActivity.class);
+                    intent.putExtra(helium314.keyboard.latin.ai.VoiceTrampolineActivity.EXTRA_VOICE_ACTION,
+                            helium314.keyboard.latin.ai.VoiceTrampolineActivity.ACTION_REQUEST_MIC);
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } catch (Exception ignored) {}
+                return;
+            }
+        }
+
+        if (!android.speech.SpeechRecognizer.isRecognitionAvailable(this)) {
+            android.widget.Toast.makeText(this, "Speech recognition not available on this device", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+        mSpeechRecognizer = android.speech.SpeechRecognizer.createSpeechRecognizer(this);
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this, "Speech init failed: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (mSpeechRecognizer == null) {
+            android.widget.Toast.makeText(this, "Speech recognizer unavailable", android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        mSpeechRecognizer.setRecognitionListener(new android.speech.RecognitionListener() {
+            @Override public void onReadyForSpeech(Bundle params) {
+                cancelAiVoiceWatchdog();
+                mAiVoiceListening = true;
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAiProcessing(true, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+                }
+            }
+            @Override public void onBeginningOfSpeech() {}
+            @Override public void onRmsChanged(float rmsdB) {}
+            @Override public void onBufferReceived(byte[] buffer) {}
+            @Override public void onEndOfSpeech() {
+                mAiVoiceListening = false;
+            }
+            @Override public void onError(int error) {
+                cancelAiVoiceWatchdog();
+                mAiVoiceListening = false;
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAiProcessing(false, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+                }
+                // Auto-retry once without forcing the locale if the requested language pack
+                // is missing or unsupported. Some Samsung devices fail with ERROR_CLIENT (5)
+                // instead of ERROR_LANGUAGE_NOT_SUPPORTED (12) when the Soda offline pack
+                // for the hint locale is absent.
+                final int ERROR_LANGUAGE_NOT_SUPPORTED = 12;
+                final int ERROR_LANGUAGE_UNAVAILABLE = 13;
+                if (!mAiVoiceLocaleRetry && (error == ERROR_LANGUAGE_NOT_SUPPORTED
+                        || error == ERROR_LANGUAGE_UNAVAILABLE
+                        || error == android.speech.SpeechRecognizer.ERROR_CLIENT)) {
+                    android.util.Log.w("LatinIME", "Voice error " + error + " - retrying without forced locale");
+                    mAiVoiceLocaleRetry = true;
+                    cleanupSpeechRecognizer();
+                    startAiVoiceRecognition();
+                    return;
+                }
+                String msg = "voice error (" + error + ")";
+                switch (error) {
+                    case android.speech.SpeechRecognizer.ERROR_NO_MATCH: msg = "no speech detected"; break;
+                    case android.speech.SpeechRecognizer.ERROR_NETWORK: msg = "network error (offline mode needs language pack)"; break;
+                    case android.speech.SpeechRecognizer.ERROR_NETWORK_TIMEOUT: msg = "network timeout"; break;
+                    case android.speech.SpeechRecognizer.ERROR_AUDIO: msg = "audio recording error"; break;
+                    case android.speech.SpeechRecognizer.ERROR_SERVER: msg = "server error"; break;
+                    case android.speech.SpeechRecognizer.ERROR_CLIENT: msg = "client error (language pack missing?)"; break;
+                    case android.speech.SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS: msg = "microphone permission denied"; break;
+                    case ERROR_LANGUAGE_NOT_SUPPORTED: msg = "language not supported (install language pack)"; break;
+                    case ERROR_LANGUAGE_UNAVAILABLE: msg = "language unavailable (install language pack)"; break;
+                }
+                showVoiceError(msg);
+                cleanupSpeechRecognizer();
+            }
+            @Override public void onResults(Bundle results) {
+                cancelAiVoiceWatchdog();
+                mAiVoiceListening = false;
+                mAiVoiceLocaleRetry = false;
+                java.util.ArrayList<String> matches = results.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION);
+                cleanupSpeechRecognizer();
+                // Always restore voice icon (stop → mic)
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAiProcessing(false, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+                }
+                if (matches != null && !matches.isEmpty()) {
+                    String rawTranscription = matches.get(0);
+                    mInputLogic.handleAiVoiceResult(rawTranscription);
+                } else {
+                    showVoiceError("no speech detected");
+                }
+            }
+            @Override public void onPartialResults(Bundle partialResults) {}
+            @Override public void onEvent(int eventType, Bundle params) {}
+        });
+
+        android.content.Intent intent = new android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L);
+        intent.putExtra(android.speech.RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L);
+        // Skip forced locale on retry, so the recognizer falls back to its default.
+        if (!mAiVoiceLocaleRetry) {
+            try {
+                android.view.inputmethod.EditorInfo ei = getCurrentInputEditorInfo();
+                if (ei != null && ei.hintLocales != null && ei.hintLocales.size() > 0) {
+                    intent.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, ei.hintLocales.get(0).toLanguageTag());
+                }
+            } catch (Exception ignored) {}
+        }
+        try {
+            mSpeechRecognizer.startListening(intent);
+            // Watchdog: if neither onReadyForSpeech nor onError fires within 8s, the
+            // remote speech service is silently broken (seen on Samsung when offline
+            // language pack is missing). Force an inline error in that case.
+            armAiVoiceWatchdog(8000L);
+        } catch (Exception e) {
+            android.util.Log.e("LatinIME", "startListening failed", e);
+            mAiVoiceListening = false;
+            if (mSuggestionStripView != null) {
+                mSuggestionStripView.setAiProcessing(false, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+            }
+            cleanupSpeechRecognizer();
+            showVoiceError("voice start failed: " + e.getMessage());
+        }
+    }
+
+    public void stopAiVoiceRecognition() {
+        cancelAiVoiceWatchdog();
+        mAiVoiceLocaleRetry = false;
+        mAiVoiceListening = false;
+        mWhisperTranscribing = false;
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setAiVoiceRecording(false);
+            mSuggestionStripView.setAiProcessing(false, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+        }
+        cleanupSpeechRecognizer();
+        if (mWhisperRecorder != null) {
+            mWhisperRecorder.release();
+            mWhisperRecorder = null;
+        }
+    }
+
+    private void cleanupSpeechRecognizer() {
+        if (mSpeechRecognizer != null) {
+            try {
+                mSpeechRecognizer.stopListening();
+                mSpeechRecognizer.destroy();
+            } catch (Exception ignored) {}
+            mSpeechRecognizer = null;
+        }
+    }
+
+    private void stopWhisperAndTranscribe() {
+        android.util.Log.d("LatinIME", "stopWhisperAndTranscribe called");
+        final long whisperEntryMs = android.os.SystemClock.elapsedRealtime();
+        android.util.Log.d("WhisperTiming", "stopWhisperAndTranscribe entry");
+        // Immediate visual + state changes on the IME thread so the user gets feedback right away.
+        final helium314.keyboard.latin.ai.WhisperRecorder recorder = mWhisperRecorder;
+        mWhisperRecorder = null;
+        mAiVoiceListening = false;
+        mWhisperTranscribing = true;
+        // Grace period: ignore taps for 600ms so a quick double-tap doesn't immediately cancel.
+        mAiVoiceCancelGraceUntil = android.os.SystemClock.uptimeMillis() + 600L;
+        // Switch from "recording" (REC icon, static) to "transcribing" (mic, pulsing).
+        // setAiProcessing handles its own haptic.
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setAiVoiceRecording(false);
+            mSuggestionStripView.setAiProcessing(true, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+        }
+        // Register the cancel handle now so the user can cancel during the upload phase.
+        final helium314.keyboard.latin.ai.AiCancelRegistry.CancelHandle whisperHandle =
+            helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.start(
+                helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+        android.widget.Toast.makeText(this, "Bezig met transcriberen...", android.widget.Toast.LENGTH_SHORT).show();
+
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+        new Thread(() -> {
+            // Heavy work off the IME thread: stop recorder, write WAV, upload + transcribe.
+            final java.io.File wavFile = recorder != null ? recorder.stop() : null;
+            final long stopDoneMs = android.os.SystemClock.elapsedRealtime();
+            android.util.Log.d("WhisperTiming", "tap_to_stop_done=" + (stopDoneMs - whisperEntryMs) + "ms wav_size=" + (wavFile != null ? wavFile.length() : -1) + "B");
+            if (wavFile == null) {
+                mHandler.post(() -> {
+                    mWhisperTranscribing = false;
+                    helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(whisperHandle);
+                    if (mSuggestionStripView != null) {
+                        mSuggestionStripView.setAiProcessing(false, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+                    }
+                });
+                return;
+            }
+            String transcription = helium314.keyboard.latin.ai.AiServiceSync.transcribeWithWhisper(wavFile, prefs, whisperHandle);
+            mHandler.post(() -> {
+                mWhisperTranscribing = false;
+                boolean cancelled = helium314.keyboard.latin.ai.AiCancelRegistry.isCancelled(whisperHandle);
+                helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(whisperHandle);
+                if (mSuggestionStripView != null) {
+                    mSuggestionStripView.setAiProcessing(false, helium314.keyboard.latin.utils.ToolbarKey.AI_VOICE);
+                }
+                if (cancelled) return;
+                if (transcription.startsWith("[Whisper")) {
+                    android.widget.Toast.makeText(this, transcription, android.widget.Toast.LENGTH_LONG).show();
+                } else {
+                    mInputLogic.handleAiVoiceResult(transcription);
+                }
+            });
+        }).start();
+    }
+
+    private void startWhisperRecording() {
+        android.util.Log.d("LatinIME", "startWhisperRecording called");
+        // Check permission
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                try {
+                    android.content.Intent intent = new android.content.Intent(this, helium314.keyboard.latin.ai.VoiceTrampolineActivity.class);
+                    intent.putExtra(helium314.keyboard.latin.ai.VoiceTrampolineActivity.EXTRA_VOICE_ACTION,
+                            helium314.keyboard.latin.ai.VoiceTrampolineActivity.ACTION_REQUEST_MIC);
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } catch (Exception ignored) {}
+                return;
+            }
+        }
+
+        mWhisperRecorder = new helium314.keyboard.latin.ai.WhisperRecorder(this);
+        mWhisperRecorder.start();
+        mAiVoiceListening = true;
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setAiVoiceRecording(true);
+        }
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+    }
+
+    public void setAiUndoAvailable(boolean available, int slotNumber) {
+        if (mSuggestionStripView != null) {
+            helium314.keyboard.latin.utils.ToolbarKey key = slotNumber == 0
+                ? helium314.keyboard.latin.utils.ToolbarKey.AI_ASSIST
+                : helium314.keyboard.latin.utils.ToolbarKey.valueOf("AI_SLOT_" + slotNumber);
+            mSuggestionStripView.setAiUndoAvailable(available, key);
+        }
+    }
+
+    public void setInlineInstructionMode(boolean active) {
+        if (mSuggestionStripView != null) {
+            mSuggestionStripView.setInlineInstructionMode(active);
+        }
+        final helium314.keyboard.keyboard.MainKeyboardView keyboardView =
+            helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getMainKeyboardView();
+        if (keyboardView != null) {
+            keyboardView.setInlineInstructionMode(active);
+        }
+    }
+
+    public void showAiInstructionDialog() {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        helium314.keyboard.latin.ai.AiDialogComponentsKt.showAiInstructionDialog(this);
+    }
+
+    public void showSlotConfigDialog(int slotNumber) {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        helium314.keyboard.latin.ai.AiDialogComponentsKt.showSlotConfigDialog(this, slotNumber);
+    }
+
+    public void showAiClipboardDialog() {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        helium314.keyboard.latin.ai.AiDialogComponentsKt.showAiClipboardDialog(this);
+    }
+
+    public void showAiActionsDialog() {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        helium314.keyboard.latin.ai.AiDialogComponentsKt.showAiActionsDialog(this);
+    }
+
+    public void showAiConversationActivity() {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        android.content.Intent intent = new android.content.Intent(this,
+                helium314.keyboard.latin.ai.ConversationActivity.class);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
+
     public boolean showInputPickerDialog() {
         if (isShowingOptionDialog()) return false;
         if (mRichImm.hasMultipleEnabledIMEsOrSubtypes(true)) {
@@ -1459,6 +2027,12 @@ public class LatinIME extends InputMethodService implements
 
     public boolean hasSuggestionStripView() {
         return null != mSuggestionStripView;
+    }
+
+    public void refreshCloudFallbackBadges() {
+        if (hasSuggestionStripView()) {
+            mSuggestionStripView.refreshCloudFallbackBadges();
+        }
     }
 
     private void setSuggestedWords(final SuggestedWords suggestedWords) {

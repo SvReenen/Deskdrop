@@ -1,136 +1,133 @@
-# HeliBoard
-HeliBoard is a privacy-conscious and customizable open-source keyboard, based on AOSP / OpenBoard.
-Does not use internet permission, and thus is 100% offline.
+# Deskdrop
 
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/packages/helium314.keyboard/)
-[<img src="https://user-images.githubusercontent.com/663460/26973090-f8fdc986-4d14-11e7-995a-e7c5e79ed925.png" alt="Get APK from GitHub" height="80">](https://github.com/HeliBorg/HeliBoard/releases/latest)
-[<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroid" height="80">](https://apt.izzysoft.de/fdroid/index/apk/helium314.keyboard)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Android 9.0+](https://img.shields.io/badge/Android-9.0%2B-brightgreen.svg)]()
+[![Release](https://img.shields.io/badge/Release-v1.0-orange.svg)]()
 
-## Table of Contents
+An Android keyboard with built-in AI powered by your own local server. Connect to Ollama, LM Studio, or any OpenAI-compatible backend over Tailscale or LAN. Cloud providers available as fallback or standalone.
 
-- [Features](#features)
-- [Contributing](#contributing-)
-   * [Reporting Issues](#reporting-issues)
-   * [Translations](#translations)
-   * [To Community Creation](#to-community)
-   * [Code Contribution](CONTRIBUTING.md)
-- [Links](#links)
-- [License](#license)
-- [Credits](#credits)
-  * [Funding](#funding)
+<!-- TODO: Add demo video / screenshots here -->
 
-# Features
-<ul>
-  <li>Add dictionaries for suggestions and spell check</li>
-  <ul>
-    <li>build your own, or get them  <a href="https://codeberg.org/Helium314/aosp-dictionaries#dictionaries">here</a> (quality may vary)</li>
-    <li>additional dictionaries for emojis or scientific symbols can be used to provide suggestions (similar to "emoji search")</li>
-    <li>note that for Korean layouts, suggestions only work using <a href="https://github.com/openboard-team/openboard/commit/83fca9533c03b9fecc009fc632577226bbd6301f">this dictionary</a>, the tools in the dictionary repository are not able to create working dictionaries</li>
-  </ul>
-  <li>Customize keyboard themes (style, colors and background image)</li>
-  <li>Emoji search (inline and separate, requires <a href="https://codeberg.org/Helium314/aosp-dictionaries">emoji dictionary</a>)</li>
-  <ul>
-    <li>can follow the system's day/night setting on Android 10+ (and on some versions of Android 9)</li>
-    <li>can follow dynamic colors for Android 12+</li>
-  </ul>
-  <li>Customize keyboard <a href="https://github.com/HeliBorg/HeliBoard/blob/main/layouts.md">layouts</a> (only available when disabling <i>use system languages</i>)</li>
-  <li>Customize special layouts, like symbols, number,  or functional key layout</li>
-  <li>Multilingual typing</li>
-  <li>Glide typing (<i>only with closed source library</i> ☹️)</li>
-  <ul>
-    <li>library not included in the app, as there is no compatible open source library available</li>
-    <li>can be extracted from GApps packages ("<i>swypelibs</i>"), or downloaded <a href="https://github.com/erkserkserks/openboard/tree/46fdf2b550035ca69299ce312fa158e7ade36967/app/src/main/jniLibs">here</a> (click on the file and then "raw" or the tiny download button)</li>
-  </ul>
-  <li>Clipboard history</li>
-  <li>One-handed mode</li>
-  <li>Split keyboard</li>
-  <li>Number pad</li>
-  <li>Backup and restore your settings and learned word / history data</li>
-</ul>
+## Features
 
-For [FAQ](https://github.com/HeliBorg/HeliBoard/wiki/FAQ), [hidden features](https://github.com/HeliBorg/HeliBoard/wiki/9.-Hidden-features) and more information about the app and features, please visit the [wiki](https://github.com/HeliBorg/HeliBoard/wiki)
+**Local AI integration**
+- Ollama, LM Studio, vLLM, llama.cpp, KoboldCpp, Jan, Msty, or any OpenAI-compatible server
+- Primary + LAN fallback URL for seamless connectivity
+- On-device ONNX inference (T5) for fully offline use
+- Ollama Model Wizard: create custom models with tailored system prompts
 
-# Contributing ❤
+**Cloud providers**
+- Gemini, Groq, OpenRouter, Anthropic, OpenAI
+- Cloud fallback: when your local server goes down, all shortcuts automatically switch to a cloud model and revert when it's back (red dot indicator on toolbar keys)
 
-## Reporting Issues
+**AI shortcuts**
+- AI Assist: rewrite, translate, or transform selected text with a single tap
+- 4 configurable shortcut slots, each with its own model and instruction
+- Inline instructions with `//` syntax (e.g. type text followed by `//make shorter`)
+- AI Clipboard: process clipboard content through AI
+- Undo: tap again after AI processing to restore original text
 
-Whether you encountered a bug, or want to see a new feature in HeliBoard, you can contribute to the project by opening a new issue [here](https://github.com/HeliBorg/HeliBoard/issues). Your help is always welcome!
+**Voice**
+- Self-hosted Whisper transcription (via Speaches or any Whisper-compatible server)
+- Google Speech Recognition as alternative engine
+- Configurable voice modes with custom prompts
+- Supports `{voice_input}` and `{clipboard}` placeholders
 
-Before opening a new issue, be sure to check the following:
- - **Does the issue already exist?** Make sure a similar issue has not been reported by browsing [existing issues](https://github.com/HeliBorg/HeliBoard/issues?q=). Please search open and closed issues. In case of feature requests you could also check the [FAQ](https://github.com/HeliBorg/HeliBoard/wiki/FAQ) and [hidden features](https://github.com/HeliBorg/HeliBoard/wiki/9.-Hidden-features).
- - **Is the issue still relevant?** Make sure your issue is not already fixed in the latest version of HeliBoard.
- - **Is it a single topic?** If you want to suggest multiple things, open multiple issues.
- - **Did you use the issue template?** It is important to make life of our kind contributors easier by avoiding issues that miss key information to their resolution.
-Note that issues that that ignore part of the issue template will likely get treated with very low priority, as often they are needlessly hard to read or understand (e.g. huge screenshots, not providing a proper description, or addressing multiple topics). Blatant violation of the guidelines may result in the issue getting closed.
+**Conversation**
+- Full multi-turn chat interface
+- Model picker per conversation
+- Reminder system with notifications that reopen the exact conversation
 
-If you're interested, you can read the following useful text about effective bug reporting (a bit longer read): https://www.chiark.greenend.org.uk/~sgtatham/bugs.html
+**17 built-in AI tools**
 
-## Translations
-Translations can be added using [Weblate](https://translate.codeberg.org/projects/heliboard/). You will need an account to update translations and add languages. Add the language you want to translate to in Languages -> Manage translated languages in the top menu bar.
-Updating translations in a PR will not be accepted, as it may cause conflicts with Weblate translations.
+| Tool | What it does |
+|---|---|
+| `calculator` | Evaluate arithmetic expressions |
+| `get_datetime` | Current date, time, timezone |
+| `unit_convert` | Convert between units (length, mass, temperature, etc.) |
+| `battery_info` | Battery percentage and charging state |
+| `device_info` | Phone model, Android version, free storage |
+| `read_clipboard` | Read clipboard contents |
+| `fetch_url` | Fetch and read a web page |
+| `web_search` | Search via Brave/Tavily |
+| `weather` | Current weather via wttr.in |
+| `set_timer` | Start a countdown timer |
+| `open_app` | Launch an app by name |
+| `set_reminder` | Schedule a notification reminder |
+| `calendar` | Read, add, update, delete calendar events |
+| `navigate` | Open turn-by-turn navigation |
+| `phone_call` | Open dialer with number |
+| `send_sms` | Open SMS app with message |
+| `contact_lookup` | Search contacts by name |
 
-Some notes on translations
-* when translating metadata, translating the changelogs is rather useless. It's available as it was requested by translators.
-* the `hidden_features_message` is horrible to translate with Weblate, and serves little benefit as it's just a copy of what's already in the wiki: https://github.com/HeliBorg/HeliBoard/wiki/9.-Hidden-features. It's been made available in the app on user request/contribution.
+**MCP (Model Context Protocol)**
+- Connect external tool servers (Home Assistant, filesystem, custom APIs)
+- Streamable HTTP and Legacy SSE transport
+- Per-server bearer token authentication
 
-## To Community
-There is the [discussions on GitHub](https://github.com/HeliBorg/HeliBoard/discussions), or if you prefer a more open network there is [Lemmy](https://lemmy.world/c/Heliboard).
-You can share your themes, layouts and dictionaries with other people:
-* Themes can be saved and loaded using the menu on top-right in the _adjust colors_ screen
-  * You can share custom colors in a separate [discussion section](https://github.com/HeliBorg/HeliBoard/discussions/categories/custom-colors)
-* Custom keyboard layouts are text files whose content you can edit, copy and share
-  * this applies to main keyboard layouts and to special layouts adjustable in advanced settings
-  * see [layouts.md](layouts.md) for details
-  * You can share custom layouts in a separate [discussion section](https://github.com/HeliBorg/HeliBoard/discussions/categories/custom-layout)
-* Creating dictionaries is a little more work
-  * first you will need a wordlist, as described [here](https://codeberg.org/Helium314/aosp-dictionaries/src/branch/main/wordlists/sample.combined) and in the repository readme
-  * the you need to compile the dictionary using [external tools](https://github.com/remi0s/aosp-dictionary-tools)
-  * the resulting file (and ideally the wordlist too) can be shared with other users
-  * note that there will not be any further dictionaries added to this app, but you can add dictionaries to the [dictionaries repository](https://codeberg.org/Helium314/aosp-dictionaries)
+**Home screen widget**
+- Quick access bar with Voice, Chat, and Execute buttons
 
-## Code Contribution
-See [Contribution Guidelines](CONTRIBUTING.md)
+## Quick start
 
-# Links
-* Info
-  * [Wiki](https://github.com/HeliBorg/HeliBoard/wiki), including FAQ, help on customizing layouts, and gesture data gathering
-  * [Layout documentation](layouts.md) (more technical info regarding layout customization)
-  * [For creating custom dictionaries](https://codeberg.org/Helium314/aosp-dictionaries#wordlist-information) (see also top of the linked readme)
-* Community
-  * [Lemmy](https://lemmy.world/c/Heliboard)
-  * [Reddit](https://www.reddit.com/r/HeliBoard)
-  * GitHub [discussions](https://github.com/HeliBorg/HeliBoard/discussions)
-* Other
-  * [Translations](https://translate.codeberg.org/projects/heliboard/)
-  * [Dictionaries](https://codeberg.org/Helium314/aosp-dictionaries)
-  * [k3lp](https://codeberg.org/k3lp/k3lp) is a WIP library for keyboard layout parsing that will be implemented in HeliBoard when ready (created by [FlorisBoard](https://github.com/florisboard/florisboard/) maintainers)
-  * [swipe-o-scope](https://codeberg.org/eclexic/swipe-o-scope) for visualizing gesture data as created when using gesture data gathering
+1. Install the APK
+2. Enable Deskdrop as your keyboard in Android Settings > System > Keyboard
+3. Open Deskdrop Settings and run the setup wizard
+4. Enter your Ollama server URL (Tailscale IP or LAN address) or a cloud API key
+5. Done. Tap the AI Assist button on the toolbar to start
 
-# License
+## Supported backends
 
-HeliBoard (as a fork of OpenBoard) is licensed under GNU General Public License v3.0.
+| Backend | Type | Setup |
+|---|---|---|
+| Ollama | Local | Server URL |
+| LM Studio | Local | Server URL (OpenAI-compatible) |
+| vLLM / llama.cpp / KoboldCpp | Local | Server URL (OpenAI-compatible) |
+| ONNX (T5) | On-device | Import model files |
+| Gemini | Cloud | API key (free tier available) |
+| Groq | Cloud | API key (free tier available) |
+| OpenRouter | Cloud | API key (free models available) |
+| Anthropic | Cloud | API key |
+| OpenAI | Cloud | API key |
 
- > Permissions of this strong copyleft license are conditioned on making available complete source code of licensed works and modifications, which include larger works using a licensed work, under the same license. Copyright and license notices must be preserved. Contributors provide an express grant of patent rights.
+## Security
 
-See repo's [LICENSE](/LICENSE) file.
+Deskdrop takes security seriously. A keyboard has access to everything you type, so trust matters.
 
-Since the app is based on Apache 2.0 licensed AOSP Keyboard, an [Apache 2.0](LICENSE-Apache-2.0) license file is provided.
-The icon is licensed under [Creative Commons BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). A [license file](LICENSE-CC-BY-SA-4.0) is also included.
+- **API key encryption** - All keys stored with AES-256-GCM via Android EncryptedSharedPreferences. Never logged, only held in memory during use.
+- **SSRF protection** - `fetch_url` blocks requests to private/internal IP ranges (loopback, link-local, site-local), preventing prompt injection attacks from scanning your local network.
+- **Prompt injection mitigation** - Clipboard reading and device actions (calendar, calls, SMS, navigation) are gated behind explicit user opt-in. Both off by default.
+- **No data backup** - `allowBackup="false"` prevents ADB or cloud export of app data.
+- **Audio cleanup** - Whisper WAV files are deleted immediately after transcription.
+- **Streaming OOM prevention** - Per-line 1MB character limit on streaming responses. Non-streaming responses capped at 10MB download, 20,000 characters to model context.
+- **Password field protection** - All AI shortcuts are blocked in password fields.
+- **Destructive action confirmation** - Calendar update/delete requires two-step confirmation: the AI first shows a preview, asks the user to confirm, then executes only after explicit approval.
+- **Input validation** - Phone numbers validated against format regex. All URI parameters encoded. All ContentResolver queries use parameterized selection arguments (no SQL injection).
+- **Contact data minimization** - Contact lookups return max 3 contacts with max 2 phone numbers and 1 email each.
+- **Tool loop cap** - Maximum 5 tool calls per AI turn, preventing runaway tool execution.
+- **Exported component protection** - All exported Android services require system-level bind permissions (`BIND_INPUT_METHOD`, `BIND_TEXT_SERVICE`, `BIND_QUICK_SETTINGS_TILE`).
 
-# Credits
-- Icon by [Fabian OvrWrt](https://github.com/FabianOvrWrt) with contributions from [The Eclectic Dyslexic](https://github.com/the-eclectic-dyslexic)
+For a complete technical reference of all settings, shortcuts, and internals, see [DESKDROP_REFERENCE.md](DESKDROP_REFERENCE.md).
+
+## Requirements
+
+- Android 9.0 (API 28) or higher
+- For local AI: an Ollama or OpenAI-compatible server reachable from your phone (Tailscale recommended)
+- For cloud AI: an API key from any supported provider
+- For voice (Whisper): a Whisper-compatible server (e.g. Speaches)
+
+## Based on
+
+Deskdrop is built on [HeliBoard](https://github.com/Helium314/HeliBoard), an open-source privacy-focused keyboard for Android. All original HeliBoard features (themes, layouts, dictionaries, clipboard history, glide typing, one-handed mode, split keyboard) are fully preserved.
+
+## License
+
+Deskdrop is licensed under [GNU General Public License v3.0](LICENSE), as a fork of HeliBoard/OpenBoard.
+
+Since the app is based on Apache 2.0 licensed AOSP Keyboard, an [Apache 2.0](LICENSE-Apache-2.0) license file is also provided.
+
+## Credits
+
+- [HeliBoard](https://github.com/Helium314/HeliBoard) by Helium314
 - [OpenBoard](https://github.com/openboard-team/openboard)
 - [AOSP Keyboard](https://android.googlesource.com/platform/packages/inputmethods/LatinIME/)
-- [LineageOS](https://review.lineageos.org/admin/repos/LineageOS/android_packages_inputmethods_LatinIME)
-- [Simple Keyboard](https://github.com/rkkr/simple-keyboard)
-- [Indic Keyboard](https://gitlab.com/indicproject/indic-keyboard)
-- [FlorisBoard](https://github.com/florisboard/florisboard/)
-- Our [contributors](https://github.com/HeliBorg/HeliBoard/graphs/contributors)
-
-## Funding
-
-This project is funded through [NGI Mobifree Fund](https://nlnet.nl/mobifree), a fund established by [NLnet](https://nlnet.nl) with financial support from the European Commission's [Next Generation Internet](https://ngi.eu) program. Learn more at the [NLnet project page](https://nlnet.nl/project/GestureTyping).
-
-[<img src="https://nlnet.nl/logo/banner.png" alt="NLnet foundation logo" width="20%" />](https://nlnet.nl)
-
-Further the project benefits from donations provided by many users (thank you all!).

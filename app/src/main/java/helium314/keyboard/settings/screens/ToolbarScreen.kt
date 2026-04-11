@@ -3,6 +3,7 @@ package helium314.keyboard.settings.screens
 
 import android.content.Context
 import android.graphics.drawable.VectorDrawable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -150,7 +151,7 @@ fun KeyboardIconsSet.GetIcon(name: String?) {
             Icon(painterResource(iconIds[name?.lowercase()]!!), name, Modifier.fillMaxSize(0.8f))
         else if (drawable != null) {
             val px = with(LocalDensity.current) { 40.dp.toPx() }.toInt()
-            Icon(drawable.toBitmap(px, px).asImageBitmap(), name, Modifier.fillMaxSize(0.8f))
+            Image(drawable.toBitmap(px, px).asImageBitmap(), name, Modifier.fillMaxSize(0.8f))
         }
     }
 }

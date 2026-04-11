@@ -16,6 +16,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
 import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -91,6 +92,10 @@ public class KeyboardView extends View {
     private boolean mShowsHints;
     /** Scale for downscaling icons and fixed size backgrounds if keyboard height is set below 80% */
     private float mIconScaleFactor;
+    /** Gold mode for inline // instruction detection */
+    protected boolean mInlineInstructionMode = false;
+    private static final int GOLD_TEXT_COLOR = 0xFFFFD700;
+    private static final int GOLD_BG_TINT = 0x50FFD700;
     /** The canvas for the above mutable keyboard bitmap */
     @NonNull
     private final Canvas mOffscreenCanvas = new Canvas();
@@ -450,6 +455,11 @@ public class KeyboardView extends View {
                 paint.setColor(Color.TRANSPARENT);
                 paint.clearShadowLayer();
             }
+            if (mInlineInstructionMode) {
+                paint.setColor(GOLD_TEXT_COLOR);
+                paint.setShadowLayer(mKeyTextShadowRadius > 0 ? mKeyTextShadowRadius * 2 : 4.0f,
+                        0.0f, 0.0f, 0x80FFD700);
+            }
             blendAlpha(paint, params.mAnimAlpha);
             canvas.drawText(label, 0, label.length(), labelX, labelBaseline, paint);
             // Turn off drop shadow and reset x-scale.
@@ -523,8 +533,15 @@ public class KeyboardView extends View {
                 iconY = (keyHeight - iconHeight) / 2; // Align vertically center.
             }
             final int iconX = (keyWidth - iconWidth) / 2; // Align horizontally center.
-            setKeyIconColor(key, icon, keyboard);
+            if (mInlineInstructionMode) {
+                icon.setColorFilter(new PorterDuffColorFilter(GOLD_TEXT_COLOR, PorterDuff.Mode.SRC_IN));
+            } else {
+                setKeyIconColor(key, icon, keyboard);
+            }
             drawIcon(canvas, icon, iconX, iconY, iconWidth, iconHeight);
+            if (mInlineInstructionMode) {
+                icon.clearColorFilter();
+            }
         }
 
         if (key.hasPopupHint() && key.getPopupKeys() != null) {
@@ -618,6 +635,13 @@ public class KeyboardView extends View {
 
     public void deallocateMemory() {
         freeOffscreenBuffer();
+    }
+
+    public void setInlineInstructionMode(final boolean active) {
+        if (mInlineInstructionMode != active) {
+            mInlineInstructionMode = active;
+            invalidateAllKeys();
+        }
     }
 
     private void setKeyIconColor(Key key, Drawable icon, Keyboard keyboard) {

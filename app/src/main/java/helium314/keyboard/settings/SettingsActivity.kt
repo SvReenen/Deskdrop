@@ -41,6 +41,7 @@ import helium314.keyboard.latin.utils.JniUtils
 import helium314.keyboard.latin.utils.GestureDataPromotionReminderDialog
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.UncachedInputMethodManagerUtils
+import android.util.Log
 import helium314.keyboard.latin.utils.cleanUnusedMainDicts
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
@@ -92,9 +93,12 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                     val dictUri by dictUriFlow.collectAsState()
                     val crashReports by crashReportFiles.collectAsState()
                     val crashFilePicker = filePicker { saveCrashReports(it) }
+                    val imeEnabled = UncachedInputMethodManagerUtils.isThisImeEnabled(this, imm)
+                    val imeCurrent = UncachedInputMethodManagerUtils.isThisImeCurrent(this, imm)
+                    val setupV2 = prefs.getBoolean(Settings.PREF_DESKDROP_SETUP_V2, false)
+                    Log.d("SettingsActivity", "Wizard check: imeEnabled=$imeEnabled, imeCurrent=$imeCurrent, setupV2=$setupV2, aiModel=${prefs.getString(Settings.PREF_AI_MODEL, "")}")
                     var showWelcomeWizard by rememberSaveable { mutableStateOf(
-                        !UncachedInputMethodManagerUtils.isThisImeCurrent(this, imm)
-                                || !UncachedInputMethodManagerUtils.isThisImeEnabled(this, imm)
+                        !imeCurrent || !imeEnabled || !setupV2
                     ) }
                     if (spellchecker)
                         Scaffold(contentWindowInsets = WindowInsets.safeDrawing) { innerPadding ->
@@ -190,12 +194,27 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
 
     private fun findCrashReports(onlyUnprotected: Boolean): List<File> {
         val unprotected = DeviceProtectedUtils.getFilesDir(this)?.listFiles().orEmpty()
-        if (onlyUnprotected)
-            return unprotected.filter { it.name.startsWith("crash_report") }
-
-        val dir = getExternalFilesDir(null)
-        val allFiles = dir?.listFiles()?.toList().orEmpty() + unprotected
-        return allFiles.filter { it.name.startsWith("crash_report") }
+        val raw = if (onlyUnprotected) {
+            unprotected.filter { it.name.startsWith("crash_report") }
+        } else {
+            val dir = getExternalFilesDir(null)
+            (dir?.listFiles()?.toList().orEmpty() + unprotected)
+                .filter { it.name.startsWith("crash_report") }
+        }
+        // Auto-delete crash reports from older app versions: only the current version is interesting.
+        val current = BuildConfig.VERSION_NAME
+        return raw.filter { file ->
+            val fromCurrent = runCatching {
+                file.useLines { lines ->
+                    lines.firstOrNull { it.startsWith("App version:") }
+                        ?.substringAfter("App version:")?.trim() == current
+                }
+            }.getOrDefault(false)
+            if (!fromCurrent) {
+                runCatching { file.delete() }
+            }
+            fromCurrent
+        }
     }
 
     private fun saveCrashReports(uri: Uri) {

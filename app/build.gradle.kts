@@ -14,8 +14,8 @@ android {
         applicationId = "helium314.keyboard"
         minSdk = 21
         targetSdk = 35
-        versionCode = 3901
-        versionName = "3.9"
+        versionCode = 10000
+        versionName = "1.0"
         ndk {
             abiFilters.clear()
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -52,9 +52,8 @@ android {
             isMinifyEnabled = false
             isJniDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
-            applicationIdSuffix = ".debug"
         }
-        base.archivesBaseName = "HeliBoard_" + defaultConfig.versionName
+        base.archivesBaseName = "Deskdrop_" + defaultConfig.versionName
         // got a little too big for GitHub after some dependency upgrades, so we remove the largest dictionary
         androidComponents.onVariants { variant: ApplicationVariant ->
             if (variant.buildType == "debug") {
@@ -63,6 +62,12 @@ android {
                 //noinspection ProguardAndroidTxtUsage we intentionally use the "normal" file here
                 variant.proguardFiles.add(project.layout.buildDirectory.file(getDefaultProguardFile("proguard-android.txt").absolutePath))
                 variant.proguardFiles.add(project.layout.buildDirectory.file(project.buildFile.parent + "/proguard-rules.pro"))
+            }
+        }
+        applicationVariants.all {
+            outputs.all {
+                (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                    "Deskdrop_" + defaultConfig.versionName + ".apk"
             }
         }
     }
@@ -133,8 +138,18 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.navigation:navigation-compose:2.9.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
+    implementation("androidx.savedstate:savedstate-ktx:1.3.0")
     implementation("sh.calvin.reorderable:reorderable:2.4.3") // for easier re-ordering, todo: check 3.0.0
     implementation("com.github.skydoves:colorpicker-compose:1.1.3") // for user-defined colors
+
+    // encrypted storage for API keys
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // onnx runtime for on-device AI
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.3")
 
     // test
     testImplementation(kotlin("test"))

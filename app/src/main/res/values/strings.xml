@@ -9,11 +9,11 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2"
     tools:ignore="MissingTranslation">
     <!-- Name of Android spell checker service. The app name should not be translated. -->
-    <string name="spell_checker_service_name">HeliBoard Spell Checker</string>
+    <string name="spell_checker_service_name">Deskdrop Spell Checker</string>
     <!-- Title for IME settings screen. The app name should not be translated. -->
-    <string name="ime_settings">HeliBoard Settings</string>
+    <string name="ime_settings">Deskdrop Settings</string>
     <!-- Title for the spell checking service settings screen. The app name should not be translated. -->
-    <string name="android_spell_checker_settings">HeliBoard Spell Checker Settings</string>
+    <string name="android_spell_checker_settings">Deskdrop Spell Checker Settings</string>
     <!-- Option to provide vibrate/haptic feedback on keypress -->
     <string name="vibrate_on_keypress">Vibrate on keypress</string>
     <!-- Option to provide vibrate/haptic feedback on keypress even in do not disturb mode -->
@@ -46,6 +46,110 @@
     <string name="settings_screen_correction">Text correction</string>
     <!-- Settings screen title for advanced settings -->
     <string name="settings_screen_advanced">Advanced</string>
+    <!-- Settings screen title for AI settings -->
+    <string name="settings_screen_ai">AI Settings</string>
+    <string name="ai_backend">Mode</string>
+    <string name="ai_backend_summary">Choose between cloud or local AI</string>
+    <string name="ai_model_select">Switch AI Model</string>
+    <string name="ai_model">Model</string>
+    <string name="ai_model_summary">Choose a cloud or local model</string>
+    <string name="gemini_api_key">Gemini API Key</string>
+    <string name="groq_api_key">Groq API Key</string>
+    <string name="openrouter_api_key">OpenRouter API Key</string>
+    <string name="anthropic_api_key">Anthropic API Key</string>
+    <string name="openai_api_key">OpenAI API Key</string>
+    <string name="brave_search_api_key">Brave Search API Key (optional)</string>
+    <string name="tavily_api_key">Tavily API Key (recommended)</string>
+    <string name="ollama_url">Ollama URL</string>
+    <string name="ollama_model">Ollama Model</string>
+    <string name="ollama_test_connection">Test connection</string>
+    <string name="ollama_connecting">Connecting...</string>
+    <string name="ollama_connected">Connected (%d models)</string>
+    <string name="ollama_connection_failed">Connection failed: %s</string>
+    <string name="onboarding_title">Welcome to Deskdrop</string>
+    <string name="onboarding_subtitle">Your private AI keyboard</string>
+    <string name="onboarding_ollama_description">Connect to your local Ollama server via Tailscale for fully private AI text improvement.</string>
+    <string name="onboarding_ollama_url_hint">Ollama URL (e.g. http://100.x.x.x:11434)</string>
+    <string name="onboarding_test_connection">Test Connection</string>
+    <string name="onboarding_skip">Skip for now</string>
+    <string name="onboarding_done">Get Started</string>
+    <string name="onboarding_about_title">Tell Deskdrop about yourself</string>
+    <string name="onboarding_about_subtitle">This helps the AI write in your style and language. You can change this anytime in Settings.</string>
+    <string name="onboarding_about_hint">e.g. My name is Alex. I usually write in English. Keep my messages short and casual.</string>
+    <string name="onboarding_cloud_hint">You can also use cloud AI models. Configure them in Settings &gt; AI.</string>
+    <string name="ai_instruction_label">AI Instruction</string>
+    <string name="ai_instruction_summary">The prompt sent to the AI along with your text</string>
+    <string name="ai_lorebook_label">About me</string>
+    <string name="ai_lorebook_summary">Personal context sent with every AI request (name, style, preferences)</string>
+    <string name="ai_instruction">Instruction</string>
+    <string name="ai_clear_text">Clear</string>
+    <string name="ai_settings_title">Deskdrop AI: Assist</string>
+    <string name="process_text_process">Process</string>
+    <string name="process_text_preview">Preview</string>
+    <string name="process_text_insert">Insert</string>
+    <string name="process_text_copy">Copy</string>
+    <string name="process_text_edit">Edit prompt</string>
+    <string name="process_text_cancel">Cancel</string>
+    <string name="process_text_instruction_hint">What should AI do with this text?</string>
+    <string name="process_text_selected">Selected text</string>
+    <string name="process_text_result">Result</string>
+    <string name="ai_choose_model">Choose model</string>
+    <string name="ai_loading_models">Loading Ollama models\u2026</string>
+    <string name="ai_custom_hint">This model has a built-in prompt. Edit it via Ollama Model Wizard.</string>
+    <string name="ai_custom_no_prompt">Custom model (no prompt found)</string>
+    <string name="ai_custom_prompt_prefix">Custom model prompt:\n\n</string>
+    <string name="ai_saved">Saved</string>
+    <string name="ai_clear">Clear</string>
+    <string name="ai_prompt_button">✨ AI Prompt</string>
+    <string name="ai_prompt_hint">Describe what this model should do, then press AI Prompt to generate a professional instruction.</string>
+    <string name="ai_slot_title">Deskdrop AI: Slot %d</string>
+    <string name="ai_slot_cleared">Slot %d cleared</string>
+    <string name="ai_slot_assigned">Slot %d: %s</string>
+    <string name="ai_slot_none">(None - clear slot)</string>
+    <string name="ai_model_suffix_ollama">" (Ollama)"</string>
+    <string name="ai_voice_model_default">Use main AI model</string>
+    <string name="ai_model_filter">Show models</string>
+    <string name="ai_model_filter_both">Both</string>
+    <string name="ai_model_filter_local">Local only</string>
+    <string name="ai_model_filter_cloud">Cloud only</string>
+    <string name="ai_inline_model">Model for // instructions</string>
+    <string name="ai_inline_model_summary">Used when you type // followed by an instruction</string>
+    <string name="ai_conversation_model">Model for conversation</string>
+    <string name="ai_conversation_model_summary">Default model when opening the conversation view</string>
+    <string name="ai_voice_title">Deskdrop AI: Voice</string>
+    <string name="ai_voice_saved">Voice mode: %s</string>
+    <string name="ai_voice_error">Could not show voice mode dialog</string>
+    <string name="ai_voice_reply_title">Reply to copied message</string>
+    <string name="ai_voice_reply_description">Just say how you want to reply. The copied message is sent as context automatically.</string>
+    <string name="ai_voice_no_clipboard">No clipboard content \u2014 copy a message first</string>
+    <string name="ai_voice_speech_engine">Speech engine</string>
+    <string name="ai_voice_engine_whisper">Whisper (server)</string>
+    <string name="ai_voice_mode_label">Mode</string>
+    <string name="ai_clipboard_empty">Clipboard is empty</string>
+    <string name="ai_clipboard_title">Deskdrop AI: Clipboard</string>
+    <string name="ai_clipboard_enter_instruction">Enter an instruction</string>
+    <string name="ai_clipboard_no_models">No models available</string>
+    <string name="ai_generating">Generating\u2026</string>
+    <string name="ai_error_prefix">AI error: %s</string>
+    <string name="ai_result_title">Result</string>
+    <string name="ai_result_hint">Tap text to edit before inserting</string>
+    <string name="ai_result_close">Close</string>
+    <string name="ai_result_cancel">Cancel</string>
+    <string name="ai_result_new_prompt">New prompt</string>
+    <string name="ai_result_insert">Insert</string>
+    <string name="ai_result_insert_selection">Insert selection</string>
+    <string name="ai_result_copy">Copy</string>
+    <string name="ai_result_copy_selection">Copy selection</string>
+    <string name="ai_result_copied">Copied to clipboard</string>
+    <!-- App shortcuts & QS tile -->
+    <string name="shortcut_new_chat">New chat</string>
+    <string name="shortcut_dictate">Dictate</string>
+    <string name="shortcut_last_chat">Last chat</string>
+    <string name="tile_voice_label">Deskdrop Voice</string>
+    <string name="voice_recording_title">Recording…</string>
+    <string name="voice_recording_stop">Stop</string>
+    <string name="voice_transcribing">Transcribing…</string>
+    <string name="widget_description">Quick access to voice, chat and commands</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
     <!-- Settings category title for Preference/Input settings -->
@@ -358,6 +462,16 @@
     <string name="redo" tools:keep="@string/redo">Redo</string>
     <string name="close_history" tools:keep="@string/close_history">Close clipboard history</string>
     <string name="emoji" tools:keep="@string/emoji">Emoji</string>
+    <string name="ai_assist" tools:keep="@string/ai_assist">AI Assist</string>
+    <string name="ai_clipboard" tools:keep="@string/ai_clipboard">AI Clipboard</string>
+    <string name="ai_slot_1" tools:keep="@string/ai_slot_1">AI Slot 1</string>
+    <string name="ai_slot_2" tools:keep="@string/ai_slot_2">AI Slot 2</string>
+    <string name="ai_slot_3" tools:keep="@string/ai_slot_3">AI Slot 3</string>
+    <string name="ai_slot_4" tools:keep="@string/ai_slot_4">AI Slot 4</string>
+    <string name="ai_voice" tools:keep="@string/ai_voice">AI Voice</string>
+    <string name="ai_conversation" tools:keep="@string/ai_conversation">AI Conversation</string>
+    <string name="ai_actions" tools:keep="@string/ai_actions">AI Actions</string>
+    <string name="ai_slot_unconfigured">Long-press to assign a model</string>
     <!-- Title of the setting to set clipboard toolbar keys -->
     <string name="clipboard_toolbar_keys">Select clipboard toolbar keys</string>
     <!-- Title of the setting to set pinned toolbar keys -->
@@ -821,6 +935,27 @@ New dictionary:
 \n► For users doing manual backups with root access: &lt;br&gt;
 \n\t• Starting at Android 7, the shared preferences file is not in the default location, because the app is using %s. This is necessary so the settings can be read before the device is unlocked, e.g. at boot; &lt;br&gt;
 \n\t• The file is located in /data/user_de/0/package_id/shared_prefs/ though this may depend on the device and Android version. &lt;br&gt; &lt;br&gt;
+\n&lt;i&gt;&lt;b&gt;AI Keyboard&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
+\n► Type &lt;b&gt;//&lt;/b&gt; followed by an instruction: everything after // becomes the AI instruction for the text before it. &lt;br&gt; &lt;br&gt;
+\n► Tap an AI button while it is processing to cancel the request. &lt;br&gt; &lt;br&gt;
+\n► Long-press &lt;b&gt;AI Assist&lt;/b&gt; to open the instruction editor. &lt;br&gt; &lt;br&gt;
+\n► Long-press &lt;b&gt;AI Voice&lt;/b&gt; to choose a voice mode. &lt;br&gt; &lt;br&gt;
+\n► Long-press &lt;b&gt;AI Conversation&lt;/b&gt; to mark all reminders as read. &lt;br&gt; &lt;br&gt;
+\n► Long-press &lt;b&gt;AI Slot 1–4&lt;/b&gt; to configure the slot (model + instruction). &lt;br&gt; &lt;br&gt;
+\n► Tap &lt;b&gt;AI Clipboard&lt;/b&gt; to pick a clipboard item and process it with AI. &lt;br&gt; &lt;br&gt;
+\n&lt;i&gt;&lt;b&gt;AI Chat&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
+\n► Long-press a chat to pin, rename, or delete it. &lt;br&gt; &lt;br&gt;
+\n► Long-press more chats to enter multi-select mode for bulk actions. &lt;br&gt; &lt;br&gt;
+\n► Tap the thermometer icon to set a per-conversation temperature. &lt;br&gt; &lt;br&gt;
+\n► Open the model picker to see a green/red dot showing if your Ollama server is reachable. &lt;br&gt; &lt;br&gt;
+\n► When a local model fails, a \"Try with cloud model?\" button appears. &lt;br&gt; &lt;br&gt;
+\n► Token usage is shown as \"X tk\" next to the Insert button under each assistant message. &lt;br&gt; &lt;br&gt;
+\n&lt;i&gt;&lt;b&gt;Widget, Tile &amp;amp; Shortcuts&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Widget&lt;/b&gt;: microphone (record + transcribe), chat (new chat), execute (AI on clipboard). &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Quick Settings tile&lt;/b&gt;: tap to start/stop recording, transcribes and opens chat. &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Share&lt;/b&gt; text, images or PDFs to Deskdrop to open a chat with the shared content. &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Select text&lt;/b&gt; in any app and choose Deskdrop from the PROCESS_TEXT menu. &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Long-press the app icon&lt;/b&gt; for shortcuts: New chat, Dictate. &lt;br&gt; &lt;br&gt;
 \n&lt;i&gt;&lt;b&gt;Debug mode / debug APK&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
 \n► Long-press a suggestion to show the source dictionary. &lt;br&gt; &lt;br&gt;
 \n► When using debug APK, you can find Debug Settings within the Advanced Preferences,though the usefulness is limited except for dumping dictionaries into the log. &lt;br&gt;

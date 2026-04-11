@@ -47,10 +47,16 @@ fun TextInputDialog(
     keyboardType: KeyboardType = KeyboardType.Unspecified,
     properties: DialogProperties = DialogProperties(),
     reducePadding: Boolean = false,
+    selectAllOnOpen: Boolean = false,
     checkTextValid: (text: String) -> Boolean = { it.isNotBlank() }
 ) {
     var value by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(initialText, selection = TextRange(if (singleLine) initialText.length else 0)))
+        val selection = when {
+            selectAllOnOpen -> TextRange(0, initialText.length)
+            singleLine -> TextRange(initialText.length)
+            else -> TextRange(0)
+        }
+        mutableStateOf(TextFieldValue(initialText, selection = selection))
     }
 
     ThreeButtonAlertDialog(

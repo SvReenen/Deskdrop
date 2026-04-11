@@ -57,9 +57,15 @@ public final class SystemBroadcastReceiver extends BroadcastReceiver {
         if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(intentAction)) {
             Log.i(TAG, "Package has been replaced: " + context.getPackageName());
             toggleAppIcon(context);
+            // Android wipes AlarmManager alarms on package replace, so
+            // re-register every still-future reminder and surface any
+            // that expired during the update gap.
+            helium314.keyboard.latin.ai.ReminderScheduler.INSTANCE.rescheduleAll(context);
         } else if (Intent.ACTION_BOOT_COMPLETED.equals(intentAction)) {
             Log.i(TAG, "Boot has been completed");
             toggleAppIcon(context);
+            // Same reason: alarms don't survive a reboot.
+            helium314.keyboard.latin.ai.ReminderScheduler.INSTANCE.rescheduleAll(context);
         } else if (Intent.ACTION_LOCALE_CHANGED.equals(intentAction)) {
             Log.i(TAG, "System locale changed");
             KeyboardLayoutSet.onSystemLocaleChanged();

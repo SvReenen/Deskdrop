@@ -65,6 +65,47 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
 
     public static final String PREF_CUSTOM_ICON_NAMES = "custom_icon_names";
     public static final String PREF_TOOLBAR_CUSTOM_KEY_CODES = "toolbar_custom_key_codes";
+
+    // AI settings
+    public static final String PREF_AI_BACKEND = "ai_backend";
+    public static final String PREF_AI_MODEL = "ai_model";
+    public static final String PREF_AI_MODEL_FILTER = "ai_model_filter";
+    public static final String PREF_GEMINI_API_KEY = "gemini_api_key";
+    public static final String PREF_GROQ_API_KEY = "groq_api_key";
+    public static final String PREF_OPENROUTER_API_KEY = "openrouter_api_key";
+    public static final String PREF_ANTHROPIC_API_KEY = "anthropic_api_key";
+    public static final String PREF_OPENAI_API_KEY = "openai_api_key";
+    public static final String PREF_BRAVE_SEARCH_API_KEY = "brave_search_api_key";
+    public static final String PREF_TAVILY_API_KEY = "tavily_api_key";
+    public static final String PREF_OLLAMA_URL = "ollama_url";
+    public static final String PREF_OLLAMA_URL_FALLBACK = "ollama_url_fallback";
+    public static final String PREF_OLLAMA_MODEL = "ollama_model";
+    public static final String PREF_OPENAI_COMPAT_URL = "openai_compat_url";
+    public static final String PREF_OPENAI_COMPAT_URL_FALLBACK = "openai_compat_url_fallback";
+    public static final String PREF_OPENAI_COMPAT_API_KEY = "openai_compat_api_key";
+    public static final String PREF_AI_INSTRUCTION = "ai_instruction";
+    public static final String PREF_AI_LOREBOOK = "ai_lorebook";
+    public static final String PREF_AI_ALLOW_NETWORK_TOOLS = "ai_allow_network_tools";
+    public static final String PREF_AI_ALLOW_ACTIONS = "ai_allow_actions";
+    public static final String PREF_AI_CLOUD_FALLBACK = "ai_cloud_fallback";
+    public static final String PREF_AI_INLINE_MODEL = "ai_inline_model";
+    public static final String PREF_AI_CONVERSATION_MODEL = "ai_conversation_model";
+    public static final String PREF_AI_SLOT_1_MODEL = "ai_slot_1_model";
+    public static final String PREF_AI_SLOT_2_MODEL = "ai_slot_2_model";
+    public static final String PREF_AI_SLOT_3_MODEL = "ai_slot_3_model";
+    public static final String PREF_AI_SLOT_4_MODEL = "ai_slot_4_model";
+    public static final String PREF_AI_CLOUD_PRESETS = "ai_cloud_presets";
+    public static final String PREF_AI_VOICE_MODE = "ai_voice_mode";
+    public static final String PREF_AI_VOICE_MODEL = "ai_voice_model";
+    public static final String PREF_AI_VOICE_CUSTOM_MODES = "ai_voice_custom_modes";
+    public static final String PREF_AI_VOICE_ENGINE = "ai_voice_engine";
+    public static final String PREF_AI_MCP_MODEL = "ai_mcp_model";
+
+    public static final String PREF_WHISPER_URL = "whisper_url";
+    public static final String PREF_WHISPER_URL_FALLBACK = "whisper_url_fallback";
+    public static final String PREF_WHISPER_MODEL = "whisper_model";
+    public static final String PREF_DESKDROP_ONBOARDING_DONE = "deskdrop_onboarding_done";
+    public static final String PREF_DESKDROP_SETUP_V2 = "deskdrop_setup_v2";
     public static final String PREF_LAYOUT_PREFIX = "layout_";
 
     public static final String PREF_AUTO_CAP = "auto_cap";

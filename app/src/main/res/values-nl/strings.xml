@@ -105,8 +105,8 @@
     <string name="more_keys_strip_description">Meer toetsen</string>
     <string name="number_row_summary">Cijferregel altijd weergeven</string>
     <string name="delete_swipe_summary">Veeg vanaf de delete-toets om grotere stukken tekst in één keer te selecteren en verwijderen</string>
-    <string name="spell_checker_service_name">HeliBoard-spellingcontrole</string>
-    <string name="android_spell_checker_settings">HeliBoard-spellingcontrole-instellingen</string>
+    <string name="spell_checker_service_name">Deskdrop-spellingcontrole</string>
+    <string name="android_spell_checker_settings">Deskdrop-spellingcontrole-instellingen</string>
     <string name="number_row">Cijferregel</string>
     <string name="incognito">Incognito-modus afdwingen</string>
     <string name="show_emoji_key">Emojitoets</string>
@@ -124,7 +124,7 @@
     <string name="prefs_long_press_keyboard_to_change_lang">Invoermethode schakelen met spatietoets</string>
     <string name="key_borders">Toetsranden</string>
     <string name="autospace_after_punctuation_summary">Automatisch spatie invoegen na interpunctie en het typen van een nieuw woord</string>
-    <string name="ime_settings">HeliBoard-instellingen</string>
+    <string name="ime_settings">Deskdrop-instellingen</string>
     <string name="settings_category_input">Invoer</string>
     <string name="settings_category_additional_keys">Extra toetsen</string>
     <string name="undo">"Ongedaan maken"</string>
@@ -333,6 +333,27 @@
 \n► Voor gebruikers die handmatige back-ups maken met roottoegang: &lt;br&gt;
 \n\t• Vanaf Android 7 bevindt het bestand met gedeelde voorkeuren zich niet op de standaardlocatie, omdat de app %s gebruikt. Dit is nodig zodat de instellingen kunnen worden gelezen voordat het apparaat wordt ontgrendeld, bv. bij het opstarten; &lt;br&gt;
 \n\t• Het bestand bevindt zich in /data/user_de/0/package_id/shared_prefs/ hoewel dit kan afhangen van het apparaat en de Android-versie. &lt;br&gt; &lt;br&gt;
+\n&lt;i&gt;&lt;b&gt;AI Toetsenbord&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
+\n► Typ &lt;b&gt;//&lt;/b&gt; gevolgd door een instructie: alles na // wordt de AI-instructie voor de tekst ervoor. &lt;br&gt; &lt;br&gt;
+\n► Tik op een AI-knop tijdens verwerking om het verzoek te annuleren. &lt;br&gt; &lt;br&gt;
+\n► Houd &lt;b&gt;AI Assist&lt;/b&gt; ingedrukt om de instructie-editor te openen. &lt;br&gt; &lt;br&gt;
+\n► Houd &lt;b&gt;AI Voice&lt;/b&gt; ingedrukt om een spraakmodus te kiezen. &lt;br&gt; &lt;br&gt;
+\n► Houd &lt;b&gt;AI Conversation&lt;/b&gt; ingedrukt om alle herinneringen als gelezen te markeren. &lt;br&gt; &lt;br&gt;
+\n► Houd &lt;b&gt;AI Slot 1–4&lt;/b&gt; ingedrukt om het slot te configureren (model + instructie). &lt;br&gt; &lt;br&gt;
+\n► Tik op &lt;b&gt;AI Clipboard&lt;/b&gt; om een klemborditem te kiezen en met AI te verwerken. &lt;br&gt; &lt;br&gt;
+\n&lt;i&gt;&lt;b&gt;AI Chat&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
+\n► Houd een chat ingedrukt om te pinnen, hernoemen of verwijderen. &lt;br&gt; &lt;br&gt;
+\n► Houd meer chats ingedrukt om meerdere te selecteren voor bulkacties. &lt;br&gt; &lt;br&gt;
+\n► Tik op het thermometer-icoon om de temperature per gesprek in te stellen. &lt;br&gt; &lt;br&gt;
+\n► Open de modelpicker om een groen/rood bolletje te zien dat aangeeft of je Ollama-server bereikbaar is. &lt;br&gt; &lt;br&gt;
+\n► Als een lokaal model faalt, verschijnt er een \"Probeer met cloud model?\" knop. &lt;br&gt; &lt;br&gt;
+\n► Tokengebruik wordt getoond als \"X tk\" naast de Insert-knop onder elk AI-bericht. &lt;br&gt; &lt;br&gt;
+\n&lt;i&gt;&lt;b&gt;Widget, Tegel &amp;amp; Snelkoppelingen&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Widget&lt;/b&gt;: microfoon (opnemen + transcriberen), chat (nieuw gesprek), uitvoeren (AI op klembord). &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Quick Settings-tegel&lt;/b&gt;: tik om opname te starten/stoppen, transcribeert en opent chat. &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Deel&lt;/b&gt; tekst, afbeeldingen of PDF\'s naar Deskdrop om een chat te openen met de gedeelde inhoud. &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Selecteer tekst&lt;/b&gt; in een app en kies Deskdrop uit het menu. &lt;br&gt; &lt;br&gt;
+\n► &lt;b&gt;Houd het app-icoon ingedrukt&lt;/b&gt; voor snelkoppelingen: Nieuwe chat, Dicteer. &lt;br&gt; &lt;br&gt;
 \n&lt;i&gt;&lt;b&gt;Debug mode / debug APK&lt;/b&gt;&lt;/i&gt; &lt;br&gt; &lt;br&gt;
 \n► Druk lang op een suggestie om het bronwoordenboek te tonen. &lt;br&gt; &lt;br&gt;
 \n► Bij gebruik van een Debug APK, kunt u foutopsporingsinstellingen vinden in de geavanceerde voorkeuren, hoewel het nut beperkt is, behalve voor het dumpen van woordenboeken in het logboek. &lt;br&gt;

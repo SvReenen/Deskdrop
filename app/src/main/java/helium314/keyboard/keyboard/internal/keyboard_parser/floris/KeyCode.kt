@@ -95,6 +95,16 @@ object KeyCode {
     const val URI_COMPONENT_TLD =           -255
 
     const val SETTINGS =                    -301
+    const val AI_ASSIST =                   -302
+    const val AI_MODEL_SELECT =             -303
+    const val AI_SLOT_1 =                   -304
+    const val AI_SLOT_2 =                   -305
+    const val AI_SLOT_3 =                   -306
+    const val AI_SLOT_4 =                   -307
+    const val AI_CLIPBOARD =                -308
+    const val AI_VOICE =                    -309
+    const val AI_CONVERSATION =             -310
+    const val AI_ACTIONS =                  -311
 
     const val CURRENCY_SLOT_1 =             -801
     const val CURRENCY_SLOT_2 =             -802
@@ -201,7 +211,8 @@ object KeyCode {
         PAGE_DOWN, META, TAB, ESCAPE, INSERT, SLEEP, MEDIA_PLAY, MEDIA_PAUSE, MEDIA_PLAY_PAUSE, MEDIA_NEXT,
         MEDIA_PREVIOUS, VOL_UP, VOL_DOWN, MUTE, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, BACK,
         TIMESTAMP, CTRL_LEFT, CTRL_RIGHT, ALT_LEFT, ALT_RIGHT, META_LEFT, META_RIGHT, SEND_INTENT_ONE, SEND_INTENT_TWO,
-        SEND_INTENT_THREE, EMOJI_SEARCH, INLINE_EMOJI_SEARCH_DONE, META_LOCK
+        SEND_INTENT_THREE, EMOJI_SEARCH, INLINE_EMOJI_SEARCH_DONE, META_LOCK,
+        AI_ASSIST, AI_SLOT_1, AI_SLOT_2, AI_SLOT_3, AI_SLOT_4, AI_CLIPBOARD
         -> this
 
         // conversion
