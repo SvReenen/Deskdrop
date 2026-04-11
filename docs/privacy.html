@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deskdrop - Privacy Policy</title>
+<meta name="theme-color" content="#0a1210">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0a1210;
+  color: #e4efe9;
+  line-height: 1.8;
+  -webkit-font-smoothing: antialiased;
+}
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 60px 20px;
+}
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+.updated {
+  color: #7a9e8f;
+  font-size: 0.85rem;
+  margin-bottom: 40px;
+}
+h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 36px;
+  margin-bottom: 12px;
+  color: #3DB89E;
+}
+p, ul {
+  color: #b8d4c8;
+  font-size: 0.95rem;
+  margin-bottom: 16px;
+}
+ul {
+  padding-left: 24px;
+}
+li {
+  margin-bottom: 8px;
+}
+a {
+  color: #3DB89E;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+.back {
+  display: inline-block;
+  margin-bottom: 32px;
+  color: #7a9e8f;
+  font-size: 0.875rem;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<a href="./" class="back">&larr; Back to Deskdrop</a>
+
+<h1>Privacy Policy</h1>
+<p class="updated">Last updated: April 12, 2026</p>
+
+<h2>Overview</h2>
+<p>Deskdrop is an open-source Android keyboard. Your privacy is the top priority. Deskdrop does not collect, transmit, or sell any personal data. There is no telemetry, no analytics, and no tracking of any kind.</p>
+
+<h2>Data that stays on your device</h2>
+<p>All of the following data is stored locally on your device and never leaves it:</p>
+<ul>
+  <li>Your typing input and learned words</li>
+  <li>Clipboard history</li>
+  <li>Conversation history</li>
+  <li>App settings and preferences</li>
+  <li>Reminders</li>
+</ul>
+
+<h2>Network connections</h2>
+<p>Deskdrop only makes network requests when you explicitly use AI features. These requests go to servers that you configure yourself:</p>
+<ul>
+  <li><strong>Local AI server</strong> (Ollama, LM Studio, etc.) - Your prompts are sent to your own server on your local network or via Tailscale. No third party is involved.</li>
+  <li><strong>Cloud AI providers</strong> (Gemini, Groq, OpenRouter, Anthropic, OpenAI) - If you choose to configure a cloud provider, your prompts are sent to that provider's API. This is entirely optional and requires you to enter your own API key. Refer to each provider's privacy policy for how they handle data.</li>
+  <li><strong>Whisper server</strong> - If you configure voice input with a self-hosted Whisper server, audio recordings are sent to your server for transcription and deleted immediately after.</li>
+  <li><strong>MCP servers</strong> - If you configure external tool servers (e.g. Home Assistant), requests are sent to those servers. This is optional and user-configured.</li>
+</ul>
+<p>Deskdrop never sends data to any server that you have not explicitly configured.</p>
+
+<h2>API key storage</h2>
+<p>API keys are encrypted using AES-256-GCM via Android's EncryptedSharedPreferences. Keys are never logged and are only held in memory during active use.</p>
+
+<h2>Permissions</h2>
+<p>Deskdrop requests only the permissions necessary for its features:</p>
+<ul>
+  <li><strong>Internet</strong> - To connect to your configured AI servers</li>
+  <li><strong>Microphone</strong> - Only when you use voice input (Whisper or Google Speech)</li>
+  <li><strong>Contacts</strong> - Only when the contacts tool is enabled (opt-in, off by default)</li>
+  <li><strong>Calendar</strong> - Only when the calendar tool is enabled (opt-in, off by default)</li>
+  <li><strong>Phone</strong> - Only when the phone call tool is enabled (opt-in, off by default)</li>
+  <li><strong>SMS</strong> - Only when the SMS tool is enabled (opt-in, off by default)</li>
+</ul>
+<p>Device action permissions (contacts, calendar, phone, SMS) are all opt-in and disabled by default. They are never accessed unless you explicitly enable them in settings.</p>
+
+<h2>Data backup</h2>
+<p>Android backup is disabled (<code>allowBackup="false"</code>). App data cannot be exported via ADB or cloud backup services.</p>
+
+<h2>Children</h2>
+<p>Deskdrop is not directed at children under 13. We do not knowingly collect data from children.</p>
+
+<h2>Open source</h2>
+<p>Deskdrop is licensed under GPL-3.0. The full source code is available at <a href="https://github.com/SvReenen/Deskdrop" target="_blank" rel="noopener">github.com/SvReenen/Deskdrop</a>. You can verify all privacy claims by reviewing the code.</p>
+
+<h2>Contact</h2>
+<p>If you have questions about this privacy policy, open an issue on <a href="https://github.com/SvReenen/Deskdrop/issues" target="_blank" rel="noopener">GitHub</a>.</p>
+
+</div>
+</body>
+</html>
