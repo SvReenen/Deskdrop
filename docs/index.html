@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deskdrop - Android Keyboard with Built-in AI</title>
+<meta name="description" content="An open-source Android keyboard with built-in AI. Connect to Ollama, LM Studio, or any local LLM server. 17 AI tools, voice input, MCP support.">
+<meta name="theme-color" content="#0a1210">
+<meta property="og:title" content="Deskdrop - Android Keyboard with Built-in AI">
+<meta property="og:description" content="Open-source Android keyboard with local AI integration. Connect to your own LLM server.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a1210;
+  --bg-card: #0f1e1a;
+  --bg-card-hover: #152a24;
+  --text: #e4efe9;
+  --text-dim: #7a9e8f;
+  --accent: #1A6B5A;
+  --accent-light: #2D8B7A;
+  --accent-bright: #3DB89E;
+  --gradient: linear-gradient(135deg, #1A6B5A, #2D8B7A);
+  --gradient-wide: linear-gradient(135deg, #145C4D, #3DB89E);
+  --gradient-subtle: linear-gradient(135deg, rgba(26,107,90,0.15), rgba(45,139,122,0.15));
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layout */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+section {
+  padding: 80px 0;
+}
+
+/* Fade-in animation */
+.fade-in {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Navigation */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10, 18, 16, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(26, 107, 90, 0.15);
+  padding: 14px 0;
+}
+nav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.nav-brand img {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+.nav-brand span {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent-bright);
+}
+.nav-links {
+  display: flex;
+  gap: 24px;
+  list-style: none;
+}
+.nav-links a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* Hero */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  padding-top: 80px;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(26,107,90,0.2) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+.hero-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  background: var(--gradient-subtle);
+  border: 1px solid rgba(26,107,90,0.3);
+  border-radius: 100px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-bright);
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 20px;
+  letter-spacing: -0.02em;
+}
+.hero h1 span {
+  background: var(--gradient-wide);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero p {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  color: var(--text-dim);
+  max-width: 560px;
+  margin: 0 auto 36px;
+  line-height: 1.7;
+}
+.hero-buttons {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  border: none;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary {
+  background: var(--gradient);
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(26,107,90,0.35);
+}
+.btn-primary:hover {
+  box-shadow: 0 6px 32px rgba(26,107,90,0.5);
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(45,139,122,0.3);
+  transform: translateY(-1px);
+}
+.btn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Section headers */
+.section-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+.section-label {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-bright);
+  margin-bottom: 12px;
+}
+.section-header h2 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+.section-header p {
+  color: var(--text-dim);
+  max-width: 520px;
+  margin: 0 auto;
+  font-size: 1.05rem;
+}
+
+/* Feature grid */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(45,139,122,0.08);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  transition: border-color 0.3s, background 0.3s;
+}
+.feature-card:hover {
+  border-color: rgba(45,139,122,0.3);
+  background: var(--bg-card-hover);
+}
+.feature-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--gradient-subtle);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+}
+.feature-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.feature-card p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* Tools grid */
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.tool-chip {
+  background: var(--bg-card);
+  border: 1px solid rgba(45,139,122,0.08);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  text-align: center;
+  transition: border-color 0.3s, background 0.3s;
+}
+.tool-chip:hover {
+  border-color: rgba(45,139,122,0.3);
+  background: var(--bg-card-hover);
+}
+.tool-chip .tool-icon {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+}
+.tool-chip .tool-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: block;
+}
+.tool-chip .tool-desc {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+  display: block;
+}
+
+/* How it works */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  counter-reset: step;
+}
+.step {
+  background: var(--bg-card);
+  border: 1px solid rgba(45,139,122,0.08);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  text-align: center;
+  position: relative;
+  counter-increment: step;
+}
+.step::before {
+  content: counter(step);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--gradient);
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 0 auto 16px;
+}
+.step h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.step p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+/* Backends */
+.backends-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.backend-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(45,139,122,0.08);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.3s;
+}
+.backend-card:hover {
+  border-color: rgba(45,139,122,0.3);
+}
+.backend-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--gradient-subtle);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.backend-info h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.backend-info span {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.backend-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+.tag-local {
+  background: rgba(26, 107, 90, 0.15);
+  color: var(--accent-bright);
+}
+.tag-cloud {
+  background: rgba(100, 120, 200, 0.15);
+  color: #8898d8;
+}
+.tag-device {
+  background: rgba(46, 213, 115, 0.15);
+  color: #2ed573;
+}
+
+/* Security */
+.security-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.security-item {
+  background: var(--bg-card);
+  border: 1px solid rgba(45,139,122,0.08);
+  border-radius: var(--radius-sm);
+  padding: 20px 22px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.security-icon {
+  width: 36px;
+  height: 36px;
+  background: rgba(26,107,90,0.12);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.security-item h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.security-item p {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* Demo videos */
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+.demo-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(45,139,122,0.08);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+.demo-card:hover {
+  border-color: rgba(45,139,122,0.3);
+}
+.demo-card video {
+  width: 100%;
+  display: block;
+  border-bottom: 1px solid rgba(45,139,122,0.08);
+}
+.demo-card .demo-info {
+  padding: 16px 20px;
+}
+.demo-card h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.demo-card p {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* Footer */
+footer {
+  border-top: 1px solid rgba(45,139,122,0.1);
+  padding: 40px 0;
+  text-align: center;
+}
+.footer-links {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.footer-links a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--text); }
+.footer-credits {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.8;
+}
+.footer-credits a {
+  color: var(--accent-bright);
+  text-decoration: none;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  section { padding: 60px 0; }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(10, 18, 16, 0.95);
+    backdrop-filter: blur(12px);
+    flex-direction: column;
+    padding: 16px 20px;
+    gap: 12px;
+    border-bottom: 1px solid rgba(26,107,90,0.15);
+  }
+  .nav-links.open { display: flex; }
+  .nav-toggle { display: block; }
+
+  .hero { min-height: auto; padding: 120px 0 60px; }
+  .hero-logo { width: 80px; height: 80px; border-radius: 16px; }
+  .hero-buttons { flex-direction: column; align-items: center; }
+  .btn { width: 100%; max-width: 300px; justify-content: center; }
+
+  .screenshot-placeholder { max-width: 240px; margin-top: 40px; }
+
+  .features-grid { grid-template-columns: 1fr; }
+  .tools-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .steps { grid-template-columns: 1fr; }
+  .backends-grid { grid-template-columns: 1fr; }
+  .security-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 380px) {
+  .container { padding: 0 16px; }
+  .tools-grid { grid-template-columns: repeat(2, 1fr); }
+  .tool-chip { padding: 12px 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <div class="container">
+    <a href="#" class="nav-brand">
+      <img src="icon.png" alt="Deskdrop" width="32" height="32">
+      <span>Deskdrop</span>
+    </a>
+    <button class="nav-toggle" aria-label="Toggle menu">&#9776;</button>
+    <ul class="nav-links">
+      <li><a href="#demo">Demo</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#tools">Tools</a></li>
+      <li><a href="#how-it-works">Setup</a></li>
+      <li><a href="#backends">Backends</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="https://github.com/SvReenen/Deskdrop" target="_blank" rel="noopener">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-content fade-in">
+      <div class="hero-badge">Open Source &middot; GPL-3.0</div>
+      <h1>Your keyboard,<br><span>your AI</span></h1>
+      <p>An Android keyboard with built-in AI powered by your own local server. Connect to Ollama, LM Studio, or any OpenAI-compatible backend. No cloud required.</p>
+      <div class="hero-buttons">
+        <a href="https://github.com/SvReenen/Deskdrop/releases" class="btn btn-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download APK
+        </a>
+        <a href="https://github.com/SvReenen/Deskdrop" class="btn btn-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Demo -->
+<section id="demo">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-label">Demo</div>
+      <h2>See it in action</h2>
+    </div>
+    <div class="demo-grid">
+      <div class="demo-card fade-in">
+        <video src="ai-quickbutton-demo.mp4" muted playsinline loop></video>
+        <div class="demo-info">
+          <h3>AI Assist</h3>
+          <p>Rewrite selected text with one tap</p>
+        </div>
+      </div>
+      <div class="demo-card fade-in">
+        <video src="syntax-demo.mp4" muted playsinline loop></video>
+        <div class="demo-info">
+          <h3>Inline // syntax</h3>
+          <p>Type instructions directly after your text</p>
+        </div>
+      </div>
+      <div class="demo-card fade-in">
+        <video src="clipboard-demo.mp4" muted playsinline loop></video>
+        <div class="demo-info">
+          <h3>Clipboard AI</h3>
+          <p>Process clipboard content through AI</p>
+        </div>
+      </div>
+      <div class="demo-card fade-in">
+        <video src="conversation-weather-demo.mp4" muted playsinline loop></video>
+        <div class="demo-info">
+          <h3>Conversation + Tools</h3>
+          <p>Ask about the weather, tools run automatically</p>
+        </div>
+      </div>
+      <div class="demo-card fade-in">
+        <video src="calendar-demo.mp4" muted playsinline loop></video>
+        <div class="demo-info">
+          <h3>Calendar</h3>
+          <p>Create appointments through natural language</p>
+        </div>
+      </div>
+      <div class="demo-card fade-in">
+        <video src="mcp-lights-demo.mp4" muted playsinline loop></video>
+        <div class="demo-info">
+          <h3>MCP (Home Assistant)</h3>
+          <p>Control your smart home from your keyboard</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-label">Features</div>
+      <h2>Everything you need, nothing you don't</h2>
+      <p>AI that runs on your terms. Local-first, with cloud as optional fallback.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#129302;</div>
+        <h3>Local AI integration</h3>
+        <p>Connect to Ollama, LM Studio, vLLM, llama.cpp, KoboldCpp, or any OpenAI-compatible server over Tailscale or LAN.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#9729;&#65039;</div>
+        <h3>Cloud fallback</h3>
+        <p>When your local server goes down, shortcuts automatically switch to a cloud provider and revert when it's back. Red dot indicator shows status.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#127908;</div>
+        <h3>Voice input</h3>
+        <p>Self-hosted Whisper transcription via Speaches or any Whisper-compatible server. Your voice data stays on your network.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#9889;</div>
+        <h3>AI shortcuts</h3>
+        <p>4 configurable toolbar slots. Rewrite, translate, or transform selected text with a single tap. Inline instructions with // syntax.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#128488;&#65039;</div>
+        <h3>Conversation</h3>
+        <p>Full multi-turn chat interface with model picker, streaming responses, reminders, search, and example prompts.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">&#128268;</div>
+        <h3>MCP support</h3>
+        <p>Connect external tool servers like Home Assistant or custom APIs via Model Context Protocol. Streamable HTTP and SSE transport.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI Tools -->
+<section id="tools">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-label">AI Tools</div>
+      <h2>17 built-in tools</h2>
+      <p>Your AI assistant can do more than chat. These tools run locally on your device.</p>
+    </div>
+    <div class="tools-grid fade-in">
+      <div class="tool-chip">
+        <div class="tool-icon">&#129518;</div>
+        <span class="tool-name">Calculator</span>
+        <span class="tool-desc">Arithmetic</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128197;</div>
+        <span class="tool-name">Calendar</span>
+        <span class="tool-desc">Read & write events</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128276;</div>
+        <span class="tool-name">Reminder</span>
+        <span class="tool-desc">Schedule alerts</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#9201;</div>
+        <span class="tool-name">Timer</span>
+        <span class="tool-desc">Countdown</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128222;</div>
+        <span class="tool-name">Phone call</span>
+        <span class="tool-desc">Open dialer</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128172;</div>
+        <span class="tool-name">Send SMS</span>
+        <span class="tool-desc">Compose message</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128100;</div>
+        <span class="tool-name">Contacts</span>
+        <span class="tool-desc">Look up people</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#127758;</div>
+        <span class="tool-name">Navigate</span>
+        <span class="tool-desc">Turn-by-turn</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128269;</div>
+        <span class="tool-name">Web search</span>
+        <span class="tool-desc">Brave / Tavily</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128279;</div>
+        <span class="tool-name">Fetch URL</span>
+        <span class="tool-desc">Read web pages</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#127780;&#65039;</div>
+        <span class="tool-name">Weather</span>
+        <span class="tool-desc">Current conditions</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128203;</div>
+        <span class="tool-name">Clipboard</span>
+        <span class="tool-desc">Read contents</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128267;</div>
+        <span class="tool-name">Battery</span>
+        <span class="tool-desc">Level & status</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128241;</div>
+        <span class="tool-name">Device info</span>
+        <span class="tool-desc">Model & storage</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128336;</div>
+        <span class="tool-name">Date & time</span>
+        <span class="tool-desc">Current datetime</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128207;</div>
+        <span class="tool-name">Unit convert</span>
+        <span class="tool-desc">Length, mass, temp</span>
+      </div>
+      <div class="tool-chip">
+        <div class="tool-icon">&#128260;</div>
+        <span class="tool-name">Open app</span>
+        <span class="tool-desc">Launch by name</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how-it-works">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-label">Get started</div>
+      <h2>Up and running in 3 steps</h2>
+    </div>
+    <div class="steps">
+      <div class="step fade-in">
+        <h3>Install</h3>
+        <p>Download the APK from GitHub Releases and install it. Enable Deskdrop as your keyboard in Android Settings.</p>
+      </div>
+      <div class="step fade-in">
+        <h3>Connect</h3>
+        <p>Run the setup wizard. Enter your Ollama server URL (Tailscale IP or LAN) or add a cloud API key.</p>
+      </div>
+      <div class="step fade-in">
+        <h3>Use</h3>
+        <p>Tap the AI button on the keyboard toolbar. Select text and rewrite, translate, or transform it with one tap.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Supported Backends -->
+<section id="backends">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-label">Backends</div>
+      <h2>Works with what you already run</h2>
+      <p>Any OpenAI-compatible server works. Plus native support for major cloud providers.</p>
+    </div>
+    <div class="backends-grid fade-in">
+      <div class="backend-card">
+        <div class="backend-icon">&#129433;</div>
+        <div class="backend-info">
+          <h4>Ollama</h4>
+          <span class="backend-tag tag-local">Local</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#128187;</div>
+        <div class="backend-info">
+          <h4>LM Studio</h4>
+          <span class="backend-tag tag-local">Local</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#9881;&#65039;</div>
+        <div class="backend-info">
+          <h4>vLLM / llama.cpp</h4>
+          <span class="backend-tag tag-local">Local</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#128296;</div>
+        <div class="backend-info">
+          <h4>KoboldCpp / Jan / Msty</h4>
+          <span class="backend-tag tag-local">Local</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#128290;</div>
+        <div class="backend-info">
+          <h4>ONNX (T5)</h4>
+          <span class="backend-tag tag-device">On-device</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#10024;</div>
+        <div class="backend-info">
+          <h4>Gemini</h4>
+          <span class="backend-tag tag-cloud">Cloud</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#9889;</div>
+        <div class="backend-info">
+          <h4>Groq</h4>
+          <span class="backend-tag tag-cloud">Cloud</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#128256;</div>
+        <div class="backend-info">
+          <h4>OpenRouter</h4>
+          <span class="backend-tag tag-cloud">Cloud</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#9679;</div>
+        <div class="backend-info">
+          <h4>Anthropic</h4>
+          <span class="backend-tag tag-cloud">Cloud</span>
+        </div>
+      </div>
+      <div class="backend-card">
+        <div class="backend-icon">&#9675;</div>
+        <div class="backend-info">
+          <h4>OpenAI</h4>
+          <span class="backend-tag tag-cloud">Cloud</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Security -->
+<section id="security">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-label">Security</div>
+      <h2>A keyboard you can trust</h2>
+      <p>A keyboard has access to everything you type. Deskdrop takes that responsibility seriously.</p>
+    </div>
+    <div class="security-grid">
+      <div class="security-item fade-in">
+        <div class="security-icon">&#128274;</div>
+        <div>
+          <h4>Encrypted API keys</h4>
+          <p>AES-256-GCM via Android EncryptedSharedPreferences. Never logged, only held in memory during active use.</p>
+        </div>
+      </div>
+      <div class="security-item fade-in">
+        <div class="security-icon">&#128737;&#65039;</div>
+        <div>
+          <h4>SSRF protection</h4>
+          <p>fetch_url blocks requests to private/internal IP ranges, preventing prompt injection from scanning your network.</p>
+        </div>
+      </div>
+      <div class="security-item fade-in">
+        <div class="security-icon">&#9989;</div>
+        <div>
+          <h4>Opt-in device actions</h4>
+          <p>Clipboard, calendar, calls, SMS, and navigation tools are gated behind explicit user opt-in. All off by default.</p>
+        </div>
+      </div>
+      <div class="security-item fade-in">
+        <div class="security-icon">&#128065;</div>
+        <div>
+          <h4>Open source</h4>
+          <p>Full source code on GitHub. No telemetry, no analytics, no data collection. Verify it yourself.</p>
+        </div>
+      </div>
+      <div class="security-item fade-in">
+        <div class="security-icon">&#128295;</div>
+        <div>
+          <h4>Input validation</h4>
+          <p>Phone numbers validated against format regex. URI parameters encoded. SQL injection prevented with parameterized queries.</p>
+        </div>
+      </div>
+      <div class="security-item fade-in">
+        <div class="security-icon">&#128683;</div>
+        <div>
+          <h4>Password protection</h4>
+          <p>All AI shortcuts are automatically blocked in password fields. No accidental exposure of credentials.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/SvReenen/Deskdrop" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/SvReenen/Deskdrop/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/SvReenen/Deskdrop/issues" target="_blank" rel="noopener">Issues</a>
+      <a href="https://github.com/SvReenen/Deskdrop/blob/main/LICENSE" target="_blank" rel="noopener">License (GPL-3.0)</a>
+    </div>
+    <div class="footer-credits">
+      Built on <a href="https://github.com/Helium314/HeliBoard" target="_blank" rel="noopener">HeliBoard</a><br>
+      Android 9.0+ required
+    </div>
+  </div>
+</footer>
+
+<script>
+// Intersection Observer for fade-in animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, {
+  threshold: 0.1,
+  rootMargin: '0px 0px -40px 0px'
+});
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+// Mobile nav toggle
+const toggle = document.querySelector('.nav-toggle');
+const links = document.querySelector('.nav-links');
+toggle.addEventListener('click', () => {
+  links.classList.toggle('open');
+});
+
+// Close mobile nav on link click
+links.querySelectorAll('a').forEach(a => {
+  a.addEventListener('click', () => {
+    links.classList.remove('open');
+  });
+});
+
+// Auto-play demo videos when visible
+const videoObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const video = entry.target;
+    if (entry.isIntersecting) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  });
+}, { threshold: 0.3 });
+
+document.querySelectorAll('.demo-card video').forEach(v => videoObserver.observe(v));
+
+// Navbar background on scroll
+const nav = document.querySelector('nav');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 50) {
+    nav.style.borderBottomColor = 'rgba(26, 107, 90, 0.3)';
+  } else {
+    nav.style.borderBottomColor = 'rgba(26, 107, 90, 0.15)';
+  }
+}, { passive: true });
+</script>
+
+</body>
+</html>

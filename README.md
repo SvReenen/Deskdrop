@@ -6,7 +6,25 @@
 
 An Android keyboard with built-in AI powered by your own local server. Connect to Ollama, LM Studio, or any OpenAI-compatible backend over Tailscale or LAN. Cloud providers available as fallback or standalone.
 
-<!-- TODO: Add demo video / screenshots here -->
+## Demo
+
+**AI Assist** - Rewrite selected text with one tap
+<video src="docs/ai-quickbutton-demo.mp4" width="300"></video>
+
+**Inline // syntax** - Type instructions directly after your text
+<video src="docs/syntax-demo.mp4" width="300"></video>
+
+**Clipboard AI** - Process clipboard content through AI
+<video src="docs/clipboard-demo.mp4" width="300"></video>
+
+**Conversation + Tools** - Ask about the weather, it calls the tool automatically
+<video src="docs/conversation-weather-demo.mp4" width="300"></video>
+
+**Calendar** - Create appointments through natural language
+<video src="docs/calendar-demo.mp4" width="300"></video>
+
+**MCP (Home Assistant)** - Control your smart home from your keyboard
+<video src="docs/mcp-lights-demo.mp4" width="300"></video>
 
 ## Features
 
