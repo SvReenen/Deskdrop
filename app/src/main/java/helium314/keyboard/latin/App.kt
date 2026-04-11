@@ -54,6 +54,8 @@ class App : Application() {
                 }
             }
 
+        helium314.keyboard.latin.ai.UpdateChecker.checkInBackground(this)
+
         val packageInfo = packageManager.getPackageInfo(packageName, 0)
         @Suppress("DEPRECATION")
         Log.i(
