@@ -1,4 +1,5 @@
 import com.android.build.api.variant.ApplicationVariant
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -23,12 +24,24 @@ android {
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
 
+    signingConfigs {
+        create("release") {
+            val props = Properties()
+            rootProject.file("local.properties").inputStream().use { props.load(it) }
+            storeFile = file(props.getProperty("RELEASE_STORE_FILE", "../deskdrop-release.keystore"))
+            storePassword = props.getProperty("RELEASE_STORE_PASSWORD", "")
+            keyAlias = props.getProperty("RELEASE_KEY_ALIAS", "deskdrop")
+            keyPassword = props.getProperty("RELEASE_KEY_PASSWORD", "")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = false
             isDebuggable = false
             isJniDebuggable = false
+            signingConfig = signingConfigs.getByName("release")
         }
         create("nouserlib") { // same as release, but does not allow the user to provide a library
             isMinifyEnabled = true
@@ -144,6 +157,9 @@ dependencies {
     implementation("androidx.savedstate:savedstate-ktx:1.3.0")
     implementation("sh.calvin.reorderable:reorderable:2.4.3") // for easier re-ordering, todo: check 3.0.0
     implementation("com.github.skydoves:colorpicker-compose:1.1.3") // for user-defined colors
+
+    // fragment (required for ActivityResult API)
+    implementation("androidx.fragment:fragment-ktx:1.8.6")
 
     // encrypted storage for API keys
     implementation("androidx.security:security-crypto:1.1.0-alpha06")

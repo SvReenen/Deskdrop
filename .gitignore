@@ -15,3 +15,4 @@ tools/*.txt
 *.patch
 *.diff
 *.sh
+deskdrop-release.keystore
