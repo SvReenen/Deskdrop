@@ -871,15 +871,16 @@ private fun AiVoiceModeContent(
                     Toast.makeText(ime, ime.getString(R.string.ai_loading_models), Toast.LENGTH_SHORT).show()
                     return@ModelPickerRow
                 }
-                val names = models.map { it.displayName }.toTypedArray()
-                val currentIdx = models.indexOfFirst { it.modelValue == selectedModel }.coerceAtLeast(0)
+                val snapshot = models.toList()
+                val names = snapshot.map { it.displayName }.toTypedArray()
+                val currentIdx = snapshot.indexOfFirst { it.modelValue == selectedModel }.coerceAtLeast(0)
                 showImePickerDialog(
                     ime = ime,
                     title = ime.getString(R.string.ai_model),
                     items = names,
                     selectedIndex = currentIdx,
                     onItemSelected = { which ->
-                        selectedModel = models[which].modelValue
+                        selectedModel = snapshot[which].modelValue
                     }
                 )
             }
@@ -1096,7 +1097,9 @@ fun showAiInstructionDialog(ime: LatinIME) {
     }
 
     val selectionHolder = intArrayOf(currentSel)
+    val selectedValueHolder = arrayOf(currentModel)
     val ollamaLoaded = booleanArrayOf(false)
+    val liveFetchDone = booleanArrayOf(false)
 
     // Set initial instruction
     if (currentSel in models.indices && models[currentSel].isCustomPreset) {
@@ -1124,16 +1127,20 @@ fun showAiInstructionDialog(ime: LatinIME) {
                 initialSelection = currentSel,
                 instrInput = instrInput,
                 ollamaLoaded = ollamaLoaded,
+                liveFetchDone = liveFetchDone,
                 selectionHolder = selectionHolder,
+                selectedValueHolder = selectedValueHolder,
                 needsOllamaWait = (currentModel.startsWith("ollama:") || currentModel.startsWith("openai:")) && currentSel <= 0,
-                onSave = { s ->
+                onSave = {
                     val editor = prefs.edit()
-                    if (s in models.indices) {
-                        editor.putString(Settings.PREF_AI_MODEL, models[s].modelValue)
-                        editor.putString(Settings.PREF_AI_MODEL + "_name", models[s].displayName)
-                    }
-                    if (s in models.indices && !models[s].isCustomPreset) {
-                        editor.putString(Settings.PREF_AI_INSTRUCTION, instrInput.text.toString())
+                    val targetValue = selectedValueHolder[0]
+                    val targetModel = models.firstOrNull { it.modelValue == targetValue }
+                    if (targetModel != null) {
+                        editor.putString(Settings.PREF_AI_MODEL, targetModel.modelValue)
+                        editor.putString(Settings.PREF_AI_MODEL + "_name", targetModel.displayName)
+                        if (!targetModel.isCustomPreset) {
+                            editor.putString(Settings.PREF_AI_INSTRUCTION, instrInput.text.toString())
+                        }
                     }
                     editor.commit()
                     dialogHolder[0]?.dismiss()
@@ -1158,10 +1165,12 @@ fun showAiInstructionDialog(ime: LatinIME) {
         }
         models.removeAll(toRemove)
         models.addAll(ollamaItems)
-        // Update selection if current model is Ollama
-        if (currentModel.startsWith("ollama:") || currentModel.startsWith("openai:")) {
+        // Re-map selection based on selectedValueHolder (source of truth)
+        val target = selectedValueHolder[0].ifEmpty { currentModel }
+        if (target.isNotEmpty() && (target.startsWith("ollama:") || target.startsWith("openai:"))) {
+            var found = false
             for (i in models.indices) {
-                if (models[i].modelValue == currentModel) {
+                if (models[i].modelValue == target) {
                     selectionHolder[0] = i
                     if (models[i].isCustomPreset) {
                         val p = models[i].customPrompt
@@ -1170,10 +1179,16 @@ fun showAiInstructionDialog(ime: LatinIME) {
                         instrInput.keyListener = null
                         instrInput.isFocusable = false
                         instrInput.alpha = 0.5f
+                    } else {
+                        instrInput.keyListener = android.text.method.TextKeyListener.getInstance()
+                        instrInput.isFocusableInTouchMode = true
+                        instrInput.alpha = 1f
                     }
+                    found = true
                     break
                 }
             }
+            if (!found) selectionHolder[0] = -1
         }
     }
 
@@ -1211,6 +1226,7 @@ fun showAiInstructionDialog(ime: LatinIME) {
         ime.mHandler.post {
             applyOllamaListToClipboardDialog(ollamaItems + openaiItems)
             ollamaLoaded[0] = true
+            liveFetchDone[0] = true
         }
     }.start()
 }
@@ -1223,9 +1239,11 @@ private fun AiInstructionContent(
     initialSelection: Int,
     instrInput: EditText,
     ollamaLoaded: BooleanArray,
+    liveFetchDone: BooleanArray,
     selectionHolder: IntArray,
+    selectedValueHolder: Array<String>,
     needsOllamaWait: Boolean,
-    onSave: (selectedIndex: Int) -> Unit,
+    onSave: () -> Unit,
     onCancel: () -> Unit
 ) {
     var selectedIndex by remember { mutableIntStateOf(initialSelection) }
@@ -1233,7 +1251,6 @@ private fun AiInstructionContent(
     var isCustom by remember {
         mutableStateOf(initialSelection in models.indices && models[initialSelection].isCustomPreset)
     }
-    var userHasChanged by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (!ollamaLoaded[0]) {
@@ -1241,9 +1258,18 @@ private fun AiInstructionContent(
             isOllamaLoading = !ollamaLoaded[0] && needsOllamaWait
         }
         isOllamaLoading = false
-        if (!userHasChanged && selectionHolder[0] != selectedIndex) {
+        if (selectionHolder[0] != selectedIndex) {
             selectedIndex = selectionHolder[0]
             isCustom = selectedIndex in models.indices && models[selectedIndex].isCustomPreset
+        }
+        if (!liveFetchDone[0]) {
+            while (!liveFetchDone[0]) {
+                kotlinx.coroutines.delay(200)
+            }
+            if (selectionHolder[0] != selectedIndex) {
+                selectedIndex = selectionHolder[0]
+                isCustom = selectedIndex in models.indices && models[selectedIndex].isCustomPreset
+            }
         }
     }
 
@@ -1265,20 +1291,24 @@ private fun AiInstructionContent(
                         Toast.makeText(ime, ime.getString(R.string.ai_loading_models), Toast.LENGTH_SHORT).show()
                         return@ModelPickerRow
                     }
-                    val names = models.map { it.displayName }.toTypedArray()
+                    val snapshot = models.toList()
+                    val names = snapshot.map { it.displayName }.toTypedArray()
                     showImePickerDialog(
                         ime = ime,
                         title = ime.getString(R.string.ai_choose_model),
                         items = names,
                         selectedIndex = selectedIndex,
                         onItemSelected = { which ->
-                            selectedIndex = which
-                            selectionHolder[0] = which
-                            userHasChanged = true
-                            val custom = which in models.indices && models[which].isCustomPreset
+                            val pickedModel = snapshot[which]
+                            val modelIdx = models.indexOfFirst { it.modelValue == pickedModel.modelValue }
+                            if (modelIdx < 0) return@showImePickerDialog
+                            selectedIndex = modelIdx
+                            selectionHolder[0] = modelIdx
+                            selectedValueHolder[0] = pickedModel.modelValue
+                            val custom = models[modelIdx].isCustomPreset
                             isCustom = custom
                             if (custom) {
-                                val p = models[which].customPrompt
+                                val p = models[modelIdx].customPrompt
                                 val displayPrompt = p.ifEmpty { ime.getString(R.string.ai_custom_no_prompt) }
                                 instrInput.setText(ime.getString(R.string.ai_custom_prompt_prefix) + displayPrompt)
                                 instrInput.keyListener = null
@@ -1325,7 +1355,7 @@ private fun AiInstructionContent(
             }
             Spacer(Modifier.width(8.dp))
             Button(
-                onClick = { onSave(selectedIndex) },
+                onClick = { onSave() },
                 colors = brandButtonColors(),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -1396,7 +1426,10 @@ fun showSlotConfigDialog(ime: LatinIME, slotNumber: Int) {
     }
 
     val selectionHolder = intArrayOf(initialSel)
+    // Source of truth for which model is selected — immune to list reordering.
+    val selectedValueHolder = arrayOf(currentModel)
     val ollamaLoaded = booleanArrayOf(cachedLocal.isNotEmpty())
+    val liveFetchDone = booleanArrayOf(false)
     val dialogHolder = arrayOfNulls<AlertDialog>(1)
 
     val dialog = showImeComposeDialog(
@@ -1413,22 +1446,28 @@ fun showSlotConfigDialog(ime: LatinIME, slotNumber: Int) {
                 initialSelection = initialSel,
                 instrInput = instrInput,
                 ollamaLoaded = ollamaLoaded,
+                liveFetchDone = liveFetchDone,
                 selectionHolder = selectionHolder,
+                selectedValueHolder = selectedValueHolder,
                 needsOllamaWait = (currentModel.startsWith("ollama:") || currentModel.startsWith("openai:")) && initialSel < 0,
                 modelPrefKey = modelPrefKey,
                 instrPrefKey = instrPrefKey,
-                onSave = { s ->
+                onSave = {
                     val editor = prefs.edit()
-                    if (s >= 0 && s < models.size) {
-                        editor.putString(modelPrefKey, models[s].modelValue)
-                        editor.putString(namePrefKey, models[s].displayName)
-                    } else if (s == -1) {
+                    val targetValue = selectedValueHolder[0]
+                    val targetModel = models.firstOrNull { it.modelValue == targetValue }
+                    if (targetModel != null) {
+                        editor.putString(modelPrefKey, targetModel.modelValue)
+                        editor.putString(namePrefKey, targetModel.displayName)
+                        if (targetModel.isCustomPreset) {
+                            editor.putString(instrPrefKey, targetModel.customPrompt)
+                        } else {
+                            editor.putString(instrPrefKey, instrInput.text.toString())
+                        }
+                    } else {
+                        // No model selected (cleared)
                         editor.putString(modelPrefKey, "")
                         editor.putString(namePrefKey, "")
-                    }
-                    if (s >= 0 && s < models.size && models[s].isCustomPreset) {
-                        editor.putString(instrPrefKey, models[s].customPrompt)
-                    } else {
                         editor.putString(instrPrefKey, instrInput.text.toString())
                     }
                     editor.commit()
@@ -1472,9 +1511,13 @@ fun showSlotConfigDialog(ime: LatinIME, slotNumber: Int) {
             models.removeAll { it.modelValue.startsWith("ollama:") || it.modelValue.startsWith("openai:") }
             models.addAll(ollamaItems)
             models.addAll(openaiItems)
-            if (currentModel.startsWith("ollama:") || currentModel.startsWith("openai:")) {
+
+            // Re-map selection index based on selectedValueHolder (the source of truth).
+            val target = selectedValueHolder[0].ifEmpty { currentModel }
+            if (target.isNotEmpty() && (target.startsWith("ollama:") || target.startsWith("openai:"))) {
+                var found = false
                 for (i in models.indices) {
-                    if (models[i].modelValue == currentModel) {
+                    if (models[i].modelValue == target) {
                         selectionHolder[0] = i
                         if (models[i].isCustomPreset) {
                             val p = models[i].customPrompt
@@ -1483,12 +1526,19 @@ fun showSlotConfigDialog(ime: LatinIME, slotNumber: Int) {
                             instrInput.keyListener = null
                             instrInput.isFocusable = false
                             instrInput.alpha = 0.5f
+                        } else {
+                            instrInput.keyListener = android.text.method.TextKeyListener.getInstance()
+                            instrInput.isFocusableInTouchMode = true
+                            instrInput.alpha = 1f
                         }
+                        found = true
                         break
                     }
                 }
+                if (!found) selectionHolder[0] = -1
             }
             ollamaLoaded[0] = true
+            liveFetchDone[0] = true
         }
     }.start()
 }
@@ -1503,11 +1553,13 @@ private fun AiSlotContent(
     initialSelection: Int,
     instrInput: EditText,
     ollamaLoaded: BooleanArray,
+    liveFetchDone: BooleanArray,
     selectionHolder: IntArray,
+    selectedValueHolder: Array<String>,
     needsOllamaWait: Boolean,
     modelPrefKey: String,
     instrPrefKey: String,
-    onSave: (selectedIndex: Int) -> Unit,
+    onSave: () -> Unit,
     onCancel: () -> Unit
 ) {
     var selectedIndex by remember { mutableIntStateOf(initialSelection) }
@@ -1515,17 +1567,29 @@ private fun AiSlotContent(
     var isCustom by remember {
         mutableStateOf(initialSelection >= 0 && initialSelection < models.size && models[initialSelection].isCustomPreset)
     }
-    var userHasChanged by remember { mutableStateOf(false) }
 
+    // Wait for cached data to load, then wait for live fetch to re-sync indices.
     LaunchedEffect(Unit) {
         while (!ollamaLoaded[0]) {
             kotlinx.coroutines.delay(200)
             isOllamaLoading = !ollamaLoaded[0] && needsOllamaWait
         }
         isOllamaLoading = false
-        if (!userHasChanged && selectionHolder[0] != selectedIndex) {
+        // Sync after cached data is available
+        if (selectionHolder[0] != selectedIndex) {
             selectedIndex = selectionHolder[0]
             isCustom = selectedIndex >= 0 && selectedIndex < models.size && models[selectedIndex].isCustomPreset
+        }
+        // If cache was populated but live fetch hasn't finished, wait for it
+        if (!liveFetchDone[0]) {
+            while (!liveFetchDone[0]) {
+                kotlinx.coroutines.delay(200)
+            }
+            // Re-sync after live fetch mutated the models list
+            if (selectionHolder[0] != selectedIndex) {
+                selectedIndex = selectionHolder[0]
+                isCustom = selectedIndex >= 0 && selectedIndex < models.size && models[selectedIndex].isCustomPreset
+            }
         }
     }
 
@@ -1551,28 +1615,36 @@ private fun AiSlotContent(
                         Toast.makeText(ime, ime.getString(R.string.ai_loading_models), Toast.LENGTH_SHORT).show()
                         return@ModelPickerRow
                     }
+                    // Snapshot the models list so picker indices match what the user sees,
+                    // even if the background thread mutates models before the user picks.
+                    val snapshot = models.toList()
                     val pickerNames = mutableListOf(ime.getString(R.string.ai_slot_none))
-                    pickerNames.addAll(models.map { it.displayName })
+                    pickerNames.addAll(snapshot.map { it.displayName })
                     showImePickerDialog(
                         ime = ime,
                         title = ime.getString(R.string.ai_choose_model),
                         items = pickerNames.toTypedArray(),
                         selectedIndex = if (selectedIndex < 0) 0 else selectedIndex + 1,
                         onItemSelected = { which ->
-                            userHasChanged = true
                             if (which == 0) {
                                 selectedIndex = -1
                                 selectionHolder[0] = -1
+                                selectedValueHolder[0] = ""
                                 isCustom = false
                                 instrInput.setText("")
                                 instrInput.keyListener = TextKeyListener.getInstance()
                                 instrInput.isFocusableInTouchMode = true
                                 instrInput.alpha = 1f
                             } else {
-                                val modelIdx = which - 1
+                                // Look up the picked model from the snapshot (matches what user saw),
+                                // then find its current index in the (possibly mutated) models list.
+                                val pickedModel = snapshot[which - 1]
+                                val modelIdx = models.indexOfFirst { it.modelValue == pickedModel.modelValue }
+                                if (modelIdx < 0) return@showImePickerDialog
                                 selectedIndex = modelIdx
                                 selectionHolder[0] = modelIdx
-                                val custom = modelIdx in models.indices && models[modelIdx].isCustomPreset
+                                selectedValueHolder[0] = pickedModel.modelValue
+                                val custom = models[modelIdx].isCustomPreset
                                 isCustom = custom
                                 if (custom) {
                                     val p = models[modelIdx].customPrompt
@@ -1623,7 +1695,7 @@ private fun AiSlotContent(
             }
             Spacer(Modifier.width(8.dp))
             Button(
-                onClick = { onSave(selectedIndex) },
+                onClick = { onSave() },
                 colors = brandButtonColors(),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -1688,7 +1760,9 @@ fun showAiClipboardDialog(ime: LatinIME) {
     }
 
     val selectionHolder = intArrayOf(initialSel)
+    val selectedValueHolder = arrayOf(currentModel)
     val ollamaLoaded = booleanArrayOf(cachedLocal.isNotEmpty())
+    val liveFetchDone = booleanArrayOf(false)
     val dialogHolder = arrayOfNulls<AlertDialog>(1)
 
     val dialog = showImeComposeDialog(
@@ -1704,7 +1778,9 @@ fun showAiClipboardDialog(ime: LatinIME) {
                 initialSelection = initialSel,
                 instrInput = instrInput,
                 ollamaLoaded = ollamaLoaded,
+                liveFetchDone = liveFetchDone,
                 selectionHolder = selectionHolder,
+                selectedValueHolder = selectedValueHolder,
                 dismissDialog = { dialogHolder[0]?.dismiss() }
             )
         }
@@ -1717,7 +1793,7 @@ fun showAiClipboardDialog(ime: LatinIME) {
     Thread {
         val modelFilter = prefs.getString(Settings.PREF_AI_MODEL_FILTER, Defaults.PREF_AI_MODEL_FILTER)
         if (modelFilter == "cloud") {
-            ime.mHandler.post { ollamaLoaded[0] = true }
+            ime.mHandler.post { ollamaLoaded[0] = true; liveFetchDone[0] = true }
             return@Thread
         }
         val ollamaUrl = AiServiceSync.resolveOllamaBaseUrl(prefs)
@@ -1736,13 +1812,17 @@ fun showAiClipboardDialog(ime: LatinIME) {
             models.removeAll { it.modelValue.startsWith("ollama:") || it.modelValue.startsWith("openai:") }
             models.addAll(ollamaItems)
             models.addAll(openaiItems)
-            for (i in models.indices) {
-                if (models[i].modelValue == currentModel) {
-                    selectionHolder[0] = i
-                    break
+            val target = selectedValueHolder[0].ifEmpty { currentModel }
+            if (target.isNotEmpty()) {
+                for (i in models.indices) {
+                    if (models[i].modelValue == target) {
+                        selectionHolder[0] = i
+                        break
+                    }
                 }
             }
             ollamaLoaded[0] = true
+            liveFetchDone[0] = true
         }
     }.start()
 }
@@ -1756,7 +1836,9 @@ private fun AiClipboardContent(
     initialSelection: Int,
     instrInput: EditText,
     ollamaLoaded: BooleanArray,
+    liveFetchDone: BooleanArray,
     selectionHolder: IntArray,
+    selectedValueHolder: Array<String>,
     dismissDialog: () -> Unit
 ) {
     var selectedIndex by remember { mutableIntStateOf(initialSelection) }
@@ -1772,11 +1854,13 @@ private fun AiClipboardContent(
             Toast.makeText(ime, ime.getString(R.string.ai_clipboard_enter_instruction), Toast.LENGTH_SHORT).show()
             return
         }
-        if (models.isEmpty() || selectedIndex !in models.indices) {
+        // Resolve model by selectedValueHolder (immune to index drift)
+        val targetModel = models.firstOrNull { it.modelValue == selectedValueHolder[0] }
+        if (targetModel == null) {
             Toast.makeText(ime, ime.getString(R.string.ai_clipboard_no_models), Toast.LENGTH_SHORT).show()
             return
         }
-        val model = models[selectedIndex].modelValue
+        val model = targetModel.modelValue
 
         if (!directSend) {
             // Streaming preview path: open ResultViewActivity immediately, stream tokens into bridge
@@ -1875,6 +1959,15 @@ private fun AiClipboardContent(
         if (selectionHolder[0] != selectedIndex) {
             selectedIndex = selectionHolder[0]
         }
+        if (!liveFetchDone[0]) {
+            while (!liveFetchDone[0]) {
+                kotlinx.coroutines.delay(200)
+            }
+            if (selectionHolder[0] != selectedIndex) {
+                selectedIndex = selectionHolder[0]
+                isCustom = selectedIndex in models.indices && models[selectedIndex].isCustomPreset
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1919,17 +2012,23 @@ private fun AiClipboardContent(
                         return@ModelPickerRow
                     }
                     if (models.isEmpty()) return@ModelPickerRow
-                    val names = models.map { it.displayName }.toTypedArray()
+                    val snapshot = models.toList()
+                    val names = snapshot.map { it.displayName }.toTypedArray()
                     showImePickerDialog(
                         ime = ime,
                         title = ime.getString(R.string.ai_choose_model),
                         items = names,
                         onItemSelected = { which ->
-                            selectedIndex = which
-                            val custom = which in models.indices && models[which].isCustomPreset
+                            val pickedModel = snapshot[which]
+                            val modelIdx = models.indexOfFirst { it.modelValue == pickedModel.modelValue }
+                            if (modelIdx < 0) return@showImePickerDialog
+                            selectedIndex = modelIdx
+                            selectionHolder[0] = modelIdx
+                            selectedValueHolder[0] = pickedModel.modelValue
+                            val custom = models[modelIdx].isCustomPreset
                             isCustom = custom
                             if (custom) {
-                                val p = models[which].customPrompt
+                                val p = models[modelIdx].customPrompt
                                 val displayPrompt = p.ifEmpty { ime.getString(R.string.ai_custom_no_prompt) }
                                 instrInput.setText(ime.getString(R.string.ai_custom_prompt_prefix) + displayPrompt)
                                 instrInput.keyListener = null
