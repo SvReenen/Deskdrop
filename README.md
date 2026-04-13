@@ -120,7 +120,7 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
 5. Pick a model from the list
 6. Optional: set an alternate connection for Tailscale or LAN access
 
-After setup, the wizard lets you personalize your AI and test it live before you start.
+Both paths include an optional personalization step where you can tell the AI about your writing style and language preferences. This helps AI responses sound more like you.
 
 ## Supported backends
 
