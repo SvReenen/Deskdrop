@@ -3,6 +3,7 @@ package helium314.keyboard.settings
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.Settings
 import android.util.Log
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +30,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,6 +62,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -109,30 +116,46 @@ fun WelcomeWizard(
     finish: () -> Unit
 ) {
     val ctx = LocalContext.current
+    val activity = ctx as? android.app.Activity
+    DisposableEffect(Unit) {
+        val originalOrientation = activity?.requestedOrientation
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose { activity?.requestedOrientation = originalOrientation ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
     val prefs = ctx.prefs()
     val imm = ctx.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
     val setupDone = prefs.getBoolean(helium314.keyboard.latin.settings.Settings.PREF_DESKDROP_SETUP_V2, false)
 
-    fun determineStep(): Int = when {
-        !UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm) -> 0
-        !UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm) -> 2
-        !setupDone -> 4 // IME ready, but AI not configured yet
-        else -> 3
+    fun determineSetupStep(): Int {
+        val enabled = UncachedInputMethodManagerUtils.isThisImeEnabled(ctx, imm)
+        val current = UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)
+        Log.d("WelcomeWizard", "determineSetupStep: enabled=$enabled, current=$current, setupDone=$setupDone")
+        return when {
+            !enabled -> 2
+            !current -> 3
+            !setupDone -> 4
+            else -> -1
+        }
     }
-    var step by rememberSaveable { mutableIntStateOf(determineStep()) }
+    var step by remember { mutableIntStateOf(
+        if (setupDone && determineSetupStep() == -1) -1 else 0
+    ) }
+    var selectedMode by remember { mutableStateOf("cloud") }
     val scope = rememberCoroutineScope()
     LaunchedEffect(step) {
-        if (step == 2)
+        if (step == 3)
             scope.launch {
-                while (step == 2 && !UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)) {
+                while (step == 3 && !UncachedInputMethodManagerUtils.isThisImeCurrent(ctx, imm)) {
                     delay(50)
                 }
-                if (!setupDone) step = 4 else step = 3
+                step = when (selectedMode) {
+                    "local" -> if (!setupDone) { selectedMode = "cloud"; 4 } else { finish(); return@launch }
+                    else -> 10 // Quick start → "You're all set"
+                }
             }
     }
 
     // AI setup state
-    var selectedMode by rememberSaveable { mutableStateOf("cloud") }
     var ollamaUrl by rememberSaveable {
         mutableStateOf(prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_OLLAMA_URL, Defaults.PREF_OLLAMA_URL) ?: Defaults.PREF_OLLAMA_URL)
     }
@@ -145,6 +168,8 @@ fun WelcomeWizard(
     var selectedOllamaModel by rememberSaveable { mutableStateOf("") }
     var selectedCloudModel by rememberSaveable { mutableStateOf(wizardCloudModels.first().second) }
     var apiKey by rememberSaveable { mutableStateOf("") }
+    var groqApiKey by rememberSaveable { mutableStateOf("") }
+    var geminiApiKey by rememberSaveable { mutableStateOf("") }
     var aboutMe by rememberSaveable {
         mutableStateOf(prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_LOREBOOK, Defaults.PREF_AI_LOREBOOK) ?: "")
     }
@@ -214,20 +239,23 @@ fun WelcomeWizard(
             editor.putString(helium314.keyboard.latin.settings.Settings.PREF_OPENAI_COMPAT_URL_FALLBACK, helium314.keyboard.latin.ai.AiServiceSync.normalizeOllamaUrl(openAiCompatFallbackUrl))
         }
         if (selectedMode == "cloud") {
-            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, selectedCloudModel)
-            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_INLINE_MODEL, selectedCloudModel)
-            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_CONVERSATION_MODEL, selectedCloudModel)
-            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_VOICE_MODEL, selectedCloudModel)
-            val provider = selectedCloudModel.substringBefore(":")
-            val keyPref = when (provider) {
-                "gemini" -> helium314.keyboard.latin.settings.Settings.PREF_GEMINI_API_KEY
-                "groq" -> helium314.keyboard.latin.settings.Settings.PREF_GROQ_API_KEY
-                "openrouter" -> helium314.keyboard.latin.settings.Settings.PREF_OPENROUTER_API_KEY
-                else -> null
+            // Save keys
+            if (groqApiKey.isNotBlank()) {
+                helium314.keyboard.latin.ai.SecureApiKeys.setKey(helium314.keyboard.latin.settings.Settings.PREF_GROQ_API_KEY, groqApiKey)
             }
-            if (keyPref != null && apiKey.isNotBlank()) {
-                helium314.keyboard.latin.ai.SecureApiKeys.setKey(keyPref, apiKey)
+            if (geminiApiKey.isNotBlank()) {
+                helium314.keyboard.latin.ai.SecureApiKeys.setKey(helium314.keyboard.latin.settings.Settings.PREF_GEMINI_API_KEY, geminiApiKey)
             }
+            // Auto-select model: prefer Groq (faster), fall back to Gemini
+            val autoModel = when {
+                groqApiKey.isNotBlank() -> "groq:meta-llama/llama-4-scout-17b-16e-instruct"
+                geminiApiKey.isNotBlank() -> "gemini:gemini-2.5-flash"
+                else -> selectedCloudModel
+            }
+            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, autoModel)
+            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_INLINE_MODEL, autoModel)
+            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_CONVERSATION_MODEL, autoModel)
+            editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_VOICE_MODEL, autoModel)
         }
         val commitResult = editor.commit()
         Log.d("WelcomeWizard", "commit()=$commitResult, setup_v2=${prefs.getBoolean(helium314.keyboard.latin.settings.Settings.PREF_DESKDROP_SETUP_V2, false)}, model=${prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, "")}")
@@ -248,15 +276,27 @@ fun WelcomeWizard(
     val appName = stringResource(ctx.applicationInfo.labelRes)
 
     @Composable fun bigText() {
-        val resource = when {
-            step == 0 -> R.string.setup_welcome_title
-            step <= 3 -> R.string.setup_steps_title
-            else -> R.string.onboarding_title
-        }
-        Column(Modifier.padding(bottom = 36.dp)) {
-            if (step <= 3) {
+        if (step != 0) return
+        Column(Modifier.padding(bottom = 4.dp)) {
+            if (step == 0) {
                 Text(
-                    stringResource(resource, appName),
+                    "Use AI in any app\nfrom your keyboard",
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    color = titleColor,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Rewrite, translate, and improve text instantly",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = Color(0xFFEAEAEA),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else if (step <= 3) {
+                Text(
+                    stringResource(R.string.setup_steps_title, "Deskdrop"),
                     style = MaterialTheme.typography.displayMedium,
                     textAlign = TextAlign.Center,
                     color = titleColor,
@@ -288,167 +328,216 @@ fun WelcomeWizard(
     }
 
     @Composable
-    fun ColumnScope.Step(step: Int, title: String, instruction: String, actionText: String, icon: Painter, action: () -> Unit) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("1", color = if (step == 1) titleColor else textColorDim)
-            Text("2", color = if (step == 2) titleColor else textColorDim)
-            Text("3", color = if (step == 3) titleColor else textColorDim)
+    fun SetupHeader() {
+        if (step in 1..3) {
+            val totalSteps = 3
+            val progress = step.toFloat() / totalSteps
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = BitmapPainter(
+                        BitmapFactory.decodeResource(LocalContext.current.resources, R.mipmap.ic_launcher_foreground)
+                            .asImageBitmap()
+                    ),
+                    contentDescription = "Deskdrop",
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier.weight(1f).height(6.dp)
+                        .background(DeskdropTeal.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                ) {
+                    Box(
+                        modifier = Modifier.height(6.dp)
+                            .fillMaxWidth(progress)
+                            .background(DeskdropTeal, RoundedCornerShape(3.dp))
+                    )
+                }
+            }
         }
-        Column(Modifier
-            .background(color = stepBackgroundColor)
-            .padding(16.dp)
+    }
+
+    @Composable
+    fun ColumnScope.SetupStep(title: String, description: String, buttonText: String, action: () -> Unit) {
+        Text(
+            title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = DeskdropTeal,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        )
+        Text(
+            description,
+            style = MaterialTheme.typography.bodyLarge,
+            color = titleColor,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+        )
+        Button(
+            onClick = action,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
         ) {
-            Text(title)
-            Text(instruction, style = MaterialTheme.typography.bodyLarge.merge(color = textColor))
-        }
-        Spacer(Modifier.height(4.dp))
-        Row(
-            Modifier.clickable { action() }
-                .background(color = stepBackgroundColor)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, null, Modifier.padding(end = 6.dp).size(32.dp), tint = textColor)
-            Text(actionText, Modifier.weight(1f))
+            Text(buttonText, style = MaterialTheme.typography.titleMedium)
         }
     }
 
     @Composable fun steps() {
         if (step == 0)
             Step0 { step = 1 }
-        else if (step in 1..3)
-            Column {
-                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                    step = determineStep()
+        else if (step == 1)
+            // Step 1: Quick vs Advanced choice
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                SetupHeader()
+                Text(
+                    "How do you want to start?",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = DeskdropTeal,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "You can always change this later in Settings.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(24.dp))
+                ModeCard(
+                    title = "\u26A1 Quick Start",
+                    description = "Start instantly with a free cloud model",
+                    detail = "No setup needed",
+                    selected = selectedMode == "cloud"
+                ) { selectedMode = "cloud" }
+                Spacer(Modifier.height(12.dp))
+                ModeCard(
+                    title = "\uD83D\uDD27 Advanced Setup",
+                    description = "Connect your own models and tools",
+                    detail = "Ollama, LM Studio, cloud APIs, and more",
+                    selected = selectedMode == "local"
+                ) { selectedMode = "local" }
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = {
+                        val setupStep = determineSetupStep()
+                        step = if (setupStep == -1 || setupStep == 4) {
+                            if (selectedMode == "local") { selectedMode = "cloud"; 4 } else 10
+                        } else setupStep
+                    },
+                    Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
+                ) { Text("Continue", style = MaterialTheme.typography.titleMedium, color = Color.White) }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { saveAiAndClose() }, Modifier.fillMaxWidth()) {
+                    Text("Decide later")
                 }
-                if (step == 1) {
-                    Step(
-                        step,
-                        stringResource(R.string.setup_step1_title, appName),
-                        stringResource(R.string.setup_step1_instruction, appName),
-                        stringResource(R.string.setup_step1_action),
-                        painterResource(R.drawable.ic_setup_key)
+            }
+        else if (step in 2..3)
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                SetupHeader()
+                val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                    val nextStep = determineSetupStep()
+                    step = if (nextStep == -1 || nextStep == 4) {
+                        if (selectedMode == "local") { selectedMode = "cloud"; 4 } else 10
+                    } else nextStep
+                }
+                if (step == 2) {
+                    SetupStep(
+                        "Turn on Deskdrop",
+                        "Turn on Deskdrop to use it as your keyboard.",
+                        "Open Keyboard Settings"
                     ) {
                         val intent = Intent()
                         intent.action = Settings.ACTION_INPUT_METHOD_SETTINGS
                         intent.addCategory(Intent.CATEGORY_DEFAULT)
                         launcher.launch(intent)
                     }
-                } else if (step == 2) {
-                    Step(
-                        step,
-                        stringResource(R.string.setup_step2_title, appName),
-                        stringResource(R.string.setup_step2_instruction, appName),
-                        stringResource(R.string.setup_step2_action),
-                        painterResource(R.drawable.ic_setup_select),
-                        imm::showInputMethodPicker
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        Modifier.clickable { close() }
-                            .background(color = stepBackgroundColor)
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.sym_keyboard_language_switch),
-                            null,
-                            Modifier.padding(end = 6.dp).size(32.dp),
-                            tint = textColor
-                        )
-                        Text(stringResource(R.string.setup_step3_action), Modifier.weight(1f))
-                    }
                 } else { // step 3
-                    Step(
-                        step,
-                        stringResource(R.string.setup_step3_title),
-                        stringResource(R.string.setup_step3_instruction, appName),
-                        stringResource(R.string.setup_step3_action),
-                        painterResource(R.drawable.sym_keyboard_language_switch),
-                        close
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        Modifier.clickable { step = 4 }
-                            .background(color = stepBackgroundColor)
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_setup_check),
-                            null,
-                            Modifier.padding(end = 6.dp).size(32.dp),
-                            tint = textColor
-                        )
-                        Text(stringResource(R.string.setup_finish_action), Modifier.weight(1f))
-                    }
+                    SetupStep(
+                        "Switch to Deskdrop",
+                        "Select Deskdrop as your active keyboard.",
+                        "Switch Keyboard"
+                    ) { imm.showInputMethodPicker()  }
                 }
             }
-        else // AI setup steps (4-9)
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                // Progress indicator for AI steps (4-9)
-                val aiStep = step - 3 // 1..6
-                val totalAiSteps = 6
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    for (i in 1..totalAiSteps) {
-                        Box(
-                            modifier = Modifier
-                                .size(if (i == aiStep) 10.dp else 8.dp)
-                                .background(
-                                    color = if (i <= aiStep) DeskdropTeal else DeskdropTeal.copy(alpha = 0.25f),
-                                    shape = CircleShape
-                                )
-                        )
-                        if (i < totalAiSteps) Spacer(Modifier.width(8.dp))
-                    }
-                }
+        else // AI setup steps (4+)
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
 
                 when (step) {
-                    // Step 4: Choose mode
+
+                    // Step 4: Cloud vs Local choice (Advanced users only)
                     4 -> {
                         Text(
-                            "How do you want to use AI?",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = DeskdropTeal
+                            "How do you want to use Deskdrop?",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = DeskdropTeal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "You can always change this later in Settings.",
+                            "You can change this later",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(Modifier.height(16.dp))
-                        ModeCard("Local (Ollama)", "Run AI on your own hardware. Fully private.", selectedMode == "local") { selectedMode = "local" }
-                        Spacer(Modifier.height(8.dp))
-                        ModeCard("Cloud", "Use free cloud models from Groq, OpenRouter or Gemini.", selectedMode == "cloud") { selectedMode = "cloud" }
+                        Spacer(Modifier.height(24.dp))
+                        ModeCard(
+                            title = "\u2601\uFE0F Cloud",
+                            description = "Start instantly with built-in AI",
+                            detail = "No setup needed",
+                            selected = selectedMode == "cloud"
+                        ) { selectedMode = "cloud" }
+                        Spacer(Modifier.height(12.dp))
+                        ModeCard(
+                            title = "\uD83E\uDDE0 Local",
+                            description = "Connect your own models",
+                            detail = "Maximum privacy and control",
+                            hint = "Works great with Ollama",
+                            selected = selectedMode == "local"
+                        ) { selectedMode = "local" }
                         Spacer(Modifier.height(24.dp))
                         Button(
                             onClick = { step = if (selectedMode == "local") 5 else 6 },
-                            Modifier.fillMaxWidth(),
+                            Modifier.fillMaxWidth().height(52.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
-                        ) { Text("Next") }
+                        ) { Text("Continue", style = MaterialTheme.typography.titleMedium, color = Color.White) }
                         Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { saveAiAndClose() }, Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.onboarding_skip))
-                        }
+                        OutlinedButton(onClick = { step = 1 }, Modifier.fillMaxWidth()) { Text("Back") }
                     }
 
                     // Step 5: Local (Ollama) config
                     5 -> {
-                        Text("Ollama Setup", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
-                        Spacer(Modifier.height(16.dp))
+                        Text("Connect to Ollama", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Run AI locally. No data leaves your device.",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        Spacer(Modifier.height(20.dp))
                         SettingRow("Ollama URL", ollamaUrl) { showUrlDialog = true }
+                        Spacer(Modifier.height(4.dp))
+                        Text("Default Ollama address. Change if your server runs elsewhere.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
                         Spacer(Modifier.height(8.dp))
                         SettingRow(
-                            "LAN fallback URL (optional)",
+                            "Alternate connection (optional)",
                             if (ollamaFallbackUrl.isBlank()) "(not set)" else ollamaFallbackUrl,
                             isOptional = true
                         ) { showOllamaFallbackUrlDialog = true }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text("For LAN, Tailscale, or remote access",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                        Spacer(Modifier.height(16.dp))
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(
                                 onClick = {
@@ -466,11 +555,11 @@ fun WelcomeWizard(
                                 },
                                 enabled = ollamaStatus !is OllamaStatus.Connecting && ollamaUrl.isNotBlank(),
                                 colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
-                            ) { Text(stringResource(R.string.ollama_test_connection)) }
+                            ) { Text(if (ollamaStatus is OllamaStatus.Connected) "Test again" else stringResource(R.string.ollama_test_connection)) }
                             when (val s = ollamaStatus) {
                                 is OllamaStatus.Connecting -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = DeskdropTeal)
-                                is OllamaStatus.Connected -> Text("Connected (${s.count} models)", color = DeskdropTeal, style = MaterialTheme.typography.bodySmall)
-                                is OllamaStatus.Failed -> Text(s.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                                is OllamaStatus.Connected -> Text("\u2705 Connected to Ollama \u2014 ${s.count} models available", color = DeskdropTeal, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                is OllamaStatus.Failed -> Text("\u274C ${s.error}", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, maxLines = 2)
                                 is OllamaStatus.Idle -> {}
                             }
                         }
@@ -479,7 +568,7 @@ fun WelcomeWizard(
                             SettingRow("Model", selectedOllamaModel.ifBlank { "(select)" }) { showModelDialog = true }
                         }
 
-                        // Collapsible OpenAI-compatible section (LM Studio / vLLM / llama.cpp)
+                        // Collapsible OpenAI-compatible section
                         Spacer(Modifier.height(20.dp))
                         Row(
                             modifier = Modifier
@@ -489,22 +578,27 @@ fun WelcomeWizard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                if (openAiCompatExpanded) "▲" else "▼",
+                                if (openAiCompatExpanded) "\u25B2" else "\u25BC",
                                 color = DeskdropTeal,
                                 style = MaterialTheme.typography.bodyMedium
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "Other server (LM Studio, vLLM, llama.cpp)",
+                                "Use a different local server",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = DeskdropTeal,
                                 fontWeight = FontWeight.Medium
                             )
                         }
+                        if (!openAiCompatExpanded) {
+                            Text("LM Studio, vLLM, llama.cpp, KoboldCpp",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                modifier = Modifier.padding(start = 24.dp))
+                        }
                         if (openAiCompatExpanded) {
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "Optional. Connect to any OpenAI-compatible server. Default ports: LM Studio 1234, vLLM 8000, llama.cpp 8080.",
+                                "Connect to other local servers (LM Studio, vLLM, llama.cpp). Default ports: LM Studio 1234, vLLM 8000, llama.cpp 8080.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
@@ -516,7 +610,7 @@ fun WelcomeWizard(
                             ) { showOpenAiCompatUrlDialog = true }
                             Spacer(Modifier.height(8.dp))
                             SettingRow(
-                                "LAN fallback URL (optional)",
+                                "Alternate connection (optional)",
                                 if (openAiCompatFallbackUrl.isBlank()) "(not set)" else openAiCompatFallbackUrl,
                                 isOptional = true
                             ) { showOpenAiCompatFallbackUrlDialog = true }
@@ -534,70 +628,92 @@ fun WelcomeWizard(
                             Modifier.fillMaxWidth(),
                             enabled = selectedOllamaModel.isNotBlank() && ollamaStatus is OllamaStatus.Connected,
                             colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
-                        ) { Text("Next") }
+                        ) { Text("Continue") }
+                        if (!(selectedOllamaModel.isNotBlank() && ollamaStatus is OllamaStatus.Connected)) {
+                            Spacer(Modifier.height(4.dp))
+                            Text("Test your connection to continue",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        }
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(onClick = { step = 4 }, Modifier.fillMaxWidth()) { Text("Back") }
                     }
 
                     // Step 6: Cloud config
                     6 -> {
+                        var showGroqKeyDialog by rememberSaveable { mutableStateOf(false) }
+                        var showGeminiKeyDialog by rememberSaveable { mutableStateOf(false) }
+
                         Text("Cloud AI Setup", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
                         Spacer(Modifier.height(8.dp))
-                        Text("Pick a model. Free models from Groq and OpenRouter require no API key.",
+                        Text("Cloud models require a free API key",
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                        Spacer(Modifier.height(16.dp))
-                        val displayName = wizardCloudModels.firstOrNull { it.second == selectedCloudModel }?.first ?: selectedCloudModel
-                        SettingRow("Model", displayName) { showModelDialog = true }
-                        Spacer(Modifier.height(12.dp))
-                        val provider = selectedCloudModel.substringBefore(":")
-                        val needsKey = provider == "gemini"
-                        val keyLabel = when (provider) {
-                            "gemini" -> "Gemini API Key (required)"
-                            "groq" -> "Groq API Key (optional)"
-                            "openrouter" -> "OpenRouter API Key (optional)"
-                            else -> "API Key"
-                        }
-                        SettingRow(keyLabel, if (apiKey.isBlank()) "(not set)" else "\u2022".repeat(minOf(apiKey.length, 20))) { showApiKeyDialog = true }
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "No key yet? Get a free one:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                        OutlinedButton(
-                            onClick = {
-                                ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/")))
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Get free Groq key", color = DeskdropTeal) }
+                        Spacer(Modifier.height(24.dp))
+
+                        // Groq section
+                        Text("Groq (recommended)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Fast and free", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                        Spacer(Modifier.height(8.dp))
+                        SettingRow("Paste your API key", if (groqApiKey.isBlank()) "(not set)" else "\u2022".repeat(minOf(groqApiKey.length, 20))) { showGroqKeyDialog = true }
                         Spacer(Modifier.height(6.dp))
                         OutlinedButton(
-                            onClick = {
-                                ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/")))
-                            },
+                            onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/"))) },
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text("Get free Gemini key", color = DeskdropTeal) }
+                        ) { Text("Get Groq API key", color = DeskdropTeal) }
+
+                        Spacer(Modifier.height(24.dp))
+
+                        // Gemini section
+                        Text("Gemini", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        SettingRow("Paste your API key", if (geminiApiKey.isBlank()) "(not set)" else "\u2022".repeat(minOf(geminiApiKey.length, 20))) { showGeminiKeyDialog = true }
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/"))) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Get Gemini API key", color = DeskdropTeal) }
                         Text(
                             "Gemini availability depends on your country.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             modifier = Modifier.padding(top = 4.dp)
                         )
-                        if (!needsKey) {
-                            Spacer(Modifier.height(8.dp))
-                            Text("Groq and OpenRouter free models work without an API key.",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Add at least one key to continue. You can add more later in Settings.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+
                         Spacer(Modifier.height(24.dp))
                         Button(
                             onClick = { step = 7 },
                             Modifier.fillMaxWidth(),
-                            enabled = !needsKey || apiKey.isNotBlank(),
+                            enabled = groqApiKey.isNotBlank() || geminiApiKey.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
-                        ) { Text("Next") }
+                        ) { Text("Continue") }
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(onClick = { step = 4 }, Modifier.fillMaxWidth()) { Text("Back") }
+
+                        if (showGroqKeyDialog) {
+                            TextInputDialog(
+                                onDismissRequest = { showGroqKeyDialog = false },
+                                onConfirmed = { groqApiKey = it; showGroqKeyDialog = false },
+                                initialText = groqApiKey,
+                                title = { Text("Groq API Key") },
+                                checkTextValid = { it.isNotBlank() },
+                            )
+                        }
+                        if (showGeminiKeyDialog) {
+                            TextInputDialog(
+                                onDismissRequest = { showGeminiKeyDialog = false },
+                                onConfirmed = { geminiApiKey = it; showGeminiKeyDialog = false },
+                                initialText = geminiApiKey,
+                                title = { Text("Gemini API Key") },
+                                checkTextValid = { it.isNotBlank() },
+                            )
+                        }
                     }
 
                     // Step 7: About me
@@ -630,163 +746,76 @@ fun WelcomeWizard(
                             onClick = { step = 8 },
                             Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
-                        ) { Text("Next") }
+                        ) { Text("Continue") }
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(
                             onClick = { step = 8 },
                             Modifier.fillMaxWidth()
-                        ) { Text(stringResource(R.string.onboarding_skip)) }
+                        ) { Text("Skip for now") }
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(onClick = { step = if (selectedMode == "local") 5 else 6 }, Modifier.fillMaxWidth()) { Text("Back") }
                     }
 
-                    // Step 8: Tool permissions
+                    // Step 8: Try AI
                     8 -> {
-                        Text("What can the AI do?", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "These settings control what tools the AI can use. You can always change them later in AI Settings.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
+                        Text("Try it out", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
+                        Spacer(Modifier.height(4.dp))
+                        Text("See how AI improves your text",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        Spacer(Modifier.height(16.dp))
+                        val providerLabel = if (selectedMode == "local") "Ollama ($selectedOllamaModel)"
+                        else when {
+                            groqApiKey.isNotBlank() -> "Groq (cloud)"
+                            geminiApiKey.isNotBlank() -> "Gemini (cloud)"
+                            else -> wizardCloudModels.firstOrNull { it.second == selectedCloudModel }?.first ?: selectedCloudModel
+                        }
+                        Text("AI powered by $providerLabel",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                         Spacer(Modifier.height(20.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Internet access", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                                Text(
-                                    "Web search, fetch URLs, weather",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                )
-                            }
-                            Switch(
-                                checked = allowNetworkTools,
-                                onCheckedChange = { allowNetworkTools = it },
-                                colors = SwitchDefaults.colors(checkedTrackColor = DeskdropTeal)
-                            )
+                        // Input preview
+                        Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(12.dp)) {
+                            Text("\"this app is cool but idk how to say it\"",
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Device actions", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                                Text(
-                                    "Set timers, open apps, manage calendar",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                )
-                            }
-                            Switch(
-                                checked = allowActions,
-                                onCheckedChange = { enabled ->
-                                    allowActions = enabled
-                                    if (enabled) {
-                                        calendarPermLauncher.launch(arrayOf(
-                                            android.Manifest.permission.READ_CALENDAR,
-                                            android.Manifest.permission.WRITE_CALENDAR
-                                        ))
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(checkedTrackColor = DeskdropTeal)
-                            )
-                        }
-
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("Notifications", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                                    Text(
-                                        "Reminders, alerts, and status updates",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                    )
-                                }
-                                Switch(
-                                    checked = notifGranted,
-                                    onCheckedChange = { enabled ->
-                                        if (enabled) {
-                                            notifPermLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                                        }
-                                    },
-                                    colors = SwitchDefaults.colors(checkedTrackColor = DeskdropTeal)
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(24.dp))
-                        Button(
-                            onClick = { step = 9 },
-                            Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
-                        ) { Text("Next") }
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { step = 7 }, Modifier.fillMaxWidth()) { Text("Back") }
-                    }
-
-                    // Step 9: Done
-                    9 -> {
-                        Text("You're all set!", style = MaterialTheme.typography.headlineSmall, color = DeskdropTeal, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(12.dp))
-                        val modelDisplay = if (selectedMode == "local") "Local: $selectedOllamaModel"
-                        else "Cloud: ${wizardCloudModels.firstOrNull { it.second == selectedCloudModel }?.first ?: selectedCloudModel}"
-                        Box(Modifier.fillMaxWidth().background(DeskdropTeal.copy(alpha = 0.08f), RoundedCornerShape(12.dp)).padding(16.dp)) {
-                            Column {
-                                Text("Active model:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                                Text(modelDisplay, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            }
-                        }
 
-                        // Test message
-                        Spacer(Modifier.height(12.dp))
                         var testStatus by remember { mutableStateOf<String?>(null) }
                         var testRunning by remember { mutableStateOf(false) }
-                        OutlinedButton(
+                        var testDone by remember { mutableStateOf(false) }
+                        Button(
                             onClick = {
-                                if (testRunning) return@OutlinedButton
+                                if (testRunning) return@Button
                                 testRunning = true
                                 testStatus = null
-                                // Temporarily save model settings so the test uses the configured model
                                 val editor = prefs.edit()
                                 if (selectedMode == "local" && selectedOllamaModel.isNotBlank()) {
                                     editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, "ollama:$selectedOllamaModel")
                                     editor.putString(helium314.keyboard.latin.settings.Settings.PREF_OLLAMA_URL, helium314.keyboard.latin.ai.AiServiceSync.normalizeOllamaUrl(ollamaUrl))
                                 } else if (selectedMode == "cloud") {
-                                    editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, selectedCloudModel)
-                                    val provider = selectedCloudModel.substringBefore(":")
-                                    val keyPref = when (provider) {
-                                        "gemini" -> helium314.keyboard.latin.settings.Settings.PREF_GEMINI_API_KEY
-                                        "groq" -> helium314.keyboard.latin.settings.Settings.PREF_GROQ_API_KEY
-                                        "openrouter" -> helium314.keyboard.latin.settings.Settings.PREF_OPENROUTER_API_KEY
-                                        else -> null
+                                    val autoModel = when {
+                                        groqApiKey.isNotBlank() -> "groq:meta-llama/llama-4-scout-17b-16e-instruct"
+                                        geminiApiKey.isNotBlank() -> "gemini:gemini-2.5-flash"
+                                        else -> selectedCloudModel
                                     }
-                                    if (keyPref != null && apiKey.isNotBlank()) {
-                                        helium314.keyboard.latin.ai.SecureApiKeys.setKey(keyPref, apiKey)
-                                    }
+                                    editor.putString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, autoModel)
+                                    if (groqApiKey.isNotBlank()) helium314.keyboard.latin.ai.SecureApiKeys.setKey(helium314.keyboard.latin.settings.Settings.PREF_GROQ_API_KEY, groqApiKey)
+                                    if (geminiApiKey.isNotBlank()) helium314.keyboard.latin.ai.SecureApiKeys.setKey(helium314.keyboard.latin.settings.Settings.PREF_GEMINI_API_KEY, geminiApiKey)
                                 }
                                 editor.apply()
                                 scope.launch {
                                     try {
                                         val result = withContext(Dispatchers.IO) {
                                             helium314.keyboard.latin.ai.AiServiceSync.processWithModelAndInstruction(
-                                                "Hello! This is a test message.",
+                                                "this app is cool but idk how to say it",
                                                 prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, "") ?: "",
-                                                "You are a friendly assistant. Reply briefly to the user's message.",
+                                                "You are a friendly assistant. Rewrite the user's text to sound more polished, confident, and enthusiastic. Make it sound impressive and positive. Keep it to one short sentence. Reply with only the rewritten text, nothing else.",
                                                 prefs
                                             )
                                         }
-                                        testStatus = if (result.isNotBlank()) "\u2705 $result" else "\u274C No response received"
+                                        testStatus = if (result.isNotBlank()) result else null
+                                        testDone = result.isNotBlank()
                                         testRunning = false
                                     } catch (e: Exception) {
                                         testStatus = "\u274C ${e.message}"
@@ -794,55 +823,149 @@ fun WelcomeWizard(
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !testRunning
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            enabled = !testRunning && !testDone,
+                            colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
                         ) {
                             if (testRunning) {
-                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = DeskdropTeal)
+                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Testing...", color = DeskdropTeal)
+                                Text("AI is thinking...", color = Color.White)
+                            } else if (testDone) {
+                                Text("\u2705 Done", style = MaterialTheme.typography.titleMedium, color = Color.White)
                             } else {
-                                Text("Send a test message", color = DeskdropTeal)
-                            }
-                        }
-                        if (testStatus != null) {
-                            Spacer(Modifier.height(8.dp))
-                            Box(Modifier.fillMaxWidth().background(
-                                if (testStatus!!.startsWith("Error")) MaterialTheme.colorScheme.error.copy(alpha = 0.08f) else DeskdropTeal.copy(alpha = 0.08f),
-                                RoundedCornerShape(8.dp)
-                            ).padding(12.dp)) {
-                                Text(
-                                    testStatus!!,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (testStatus!!.startsWith("Error")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 4
-                                )
+                                Text("Try AI now", style = MaterialTheme.typography.titleMedium, color = Color.White)
                             }
                         }
 
-                        Spacer(Modifier.height(16.dp))
-                        Text("Your AI toolbar", style = MaterialTheme.typography.titleMedium, color = DeskdropTeal)
-                        Spacer(Modifier.height(8.dp))
-                        Text("These buttons are pinned to your keyboard toolbar:",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                        Spacer(Modifier.height(8.dp))
-                        ToolbarHintIcon(R.drawable.ic_ai_assist, "AI Assist", "Improve, rewrite or translate your text")
-                        Spacer(Modifier.height(4.dp))
-                        ToolbarHintIcon(R.drawable.ic_ai_voice, "AI Voice", "Dictate and let AI clean up your speech")
-                        Spacer(Modifier.height(4.dp))
-                        ToolbarHintIcon(R.drawable.ic_ai_clipboard, "AI Clipboard", "Process copied text with AI")
-                        Spacer(Modifier.height(4.dp))
-                        ToolbarHintIcon(R.drawable.ic_ai_slot_1, "Slots 1-4", "Quick-access AI actions (configure in Settings)")
-                        Spacer(Modifier.height(4.dp))
-                        ToolbarHintIcon(R.drawable.ic_ai_conversation, "AI Chat", "Open Deskdrop chat for multi-turn conversations")
-                        Spacer(Modifier.height(4.dp))
-                        ToolbarHintIcon(R.drawable.ic_ai_actions, "AI Actions", "Voice commands: set timers, search the web, manage calendar (enable in toolbar settings)")
+                        // Result appears after test
+                        if (testStatus != null) {
+                            Spacer(Modifier.height(12.dp))
+                            Box(Modifier.fillMaxWidth().background(
+                                if (testStatus!!.startsWith("\u274C")) MaterialTheme.colorScheme.error.copy(alpha = 0.08f) else DeskdropTeal.copy(alpha = 0.10f),
+                                RoundedCornerShape(8.dp)
+                            ).padding(12.dp)) {
+                                Column {
+                                    if (!testStatus!!.startsWith("\u274C")) {
+                                        Text("\u2192 AI result:", style = MaterialTheme.typography.labelSmall, color = DeskdropTeal)
+                                        Spacer(Modifier.height(4.dp))
+                                    }
+                                    Text(
+                                        testStatus!!,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (testStatus!!.startsWith("\u274C")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 4
+                                    )
+                                }
+                            }
+                        }
+
                         Spacer(Modifier.height(24.dp))
-                        Button(onClick = { saveAiAndClose() }, Modifier.fillMaxWidth(), enabled = selectedMode != "local" || selectedOllamaModel.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)) {
-                            Text("Start using Deskdrop")
+                        if (testDone) {
+                            Button(
+                                onClick = { step = 9 },
+                                Modifier.fillMaxWidth().height(52.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
+                            ) { Text("Continue", style = MaterialTheme.typography.titleMedium, color = Color.White) }
+                        } else {
+                            OutlinedButton(
+                                onClick = { step = 9 },
+                                Modifier.fillMaxWidth()
+                            ) { Text("Skip") }
                         }
                         Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { step = 8 }, Modifier.fillMaxWidth()) { Text("Back") }
+                        OutlinedButton(onClick = { step = 7 }, Modifier.fillMaxWidth()) { Text("Back") }
+                    }
+
+                    // Step 9: Have fun (Advanced done)
+                    9 -> {
+                        Text(
+                            "You're all set!",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = DeskdropTeal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Open any app and start typing.\nTap the AI button when you need it.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFEAEAEA),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        AndroidView(
+                            factory = { ctx ->
+                                android.widget.VideoView(ctx).apply {
+                                    val uri = android.net.Uri.parse("android.resource://${ctx.packageName}/${R.raw.havefun_video}")
+                                    setVideoURI(uri)
+                                    setOnPreparedListener { mp ->
+                                        mp.isLooping = true
+                                        mp.setVolume(0f, 0f)
+                                        start()
+                                    }
+                                    setOnErrorListener { _, _, _ -> true }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(9f / 16f)
+                                .clip(RoundedCornerShape(16.dp))
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { saveAiAndClose() },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
+                        ) {
+                            Text("Got it!", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        }
+                    }
+                    // Step 10: Quick Start — You're all set
+                    10 -> {
+                        Text(
+                            "You're all set!",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = DeskdropTeal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Open any app and start typing.\nTap the AI button when you need it.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFEAEAEA),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        AndroidView(
+                            factory = { ctx ->
+                                android.widget.VideoView(ctx).apply {
+                                    val uri = android.net.Uri.parse("android.resource://${ctx.packageName}/${R.raw.havefun_video}")
+                                    setVideoURI(uri)
+                                    setOnPreparedListener { mp ->
+                                        mp.isLooping = true
+                                        mp.setVolume(0f, 0f)
+                                        start()
+                                    }
+                                    setOnErrorListener { _, _, _ -> true }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(9f / 16f)
+                                .clip(RoundedCornerShape(16.dp))
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { saveAiAndClose() },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
+                        ) {
+                            Text("Got it!", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        }
                     }
                 }
             }
@@ -857,6 +980,15 @@ fun WelcomeWizard(
                 modifier = Modifier.fillMaxSize().padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
+                // Logo overlay top-left
+                Image(
+                    painter = BitmapPainter(
+                        BitmapFactory.decodeResource(ctx.resources, R.mipmap.ic_launcher_foreground)
+                            .asImageBitmap()
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp).align(Alignment.TopStart)
+                )
                 if (useWideLayout)
                     Row {
                         Box(Modifier.weight(0.4f)) { bigText() }
@@ -962,22 +1094,42 @@ fun WelcomeWizard(
 
 @Composable
 fun Step0(onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(painterResource(R.drawable.setup_welcome_image), null)
-        Row(Modifier.clickable { onClick() }
-            .padding(top = 4.dp, start = 4.dp, end = 4.dp)
+    val context = LocalContext.current
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(horizontal = 24.dp)
+    ) {
+        AndroidView(
+            factory = { ctx ->
+                android.widget.VideoView(ctx).apply {
+                    val uri = android.net.Uri.parse("android.resource://${ctx.packageName}/${R.raw.onboarding_video}")
+                    setVideoURI(uri)
+                    setOnPreparedListener { mp ->
+                        mp.isLooping = true
+                        mp.setVolume(0f, 0f)
+                        start()
+                    }
+                    setOnErrorListener { _, _, _ -> true }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(886f / 1750f)
+                .clip(RoundedCornerShape(16.dp))
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
         ) {
-            Spacer(Modifier.weight(1f))
-            Text(
-                stringResource(R.string.setup_start_action),
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+            Text("Try it now!", style = MaterialTheme.typography.titleMedium, color = Color.White)
         }
     }
 }
 
 @Composable
-private fun ModeCard(title: String, description: String, selected: Boolean, onClick: () -> Unit) {
+private fun ModeCard(title: String, description: String, detail: String, hint: String? = null, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth()
             .background(if (selected) DeskdropTeal.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
@@ -987,8 +1139,15 @@ private fun ModeCard(title: String, description: String, selected: Boolean, onCl
         RadioButton(selected = selected, onClick = onClick)
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyLarge)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+            Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(2.dp))
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+            Spacer(Modifier.height(4.dp))
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            if (hint != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(hint, style = MaterialTheme.typography.bodySmall, color = DeskdropTeal, fontWeight = FontWeight.Medium)
+            }
         }
     }
 }

@@ -73,9 +73,9 @@
     <string name="onboarding_test_connection">Test Connection</string>
     <string name="onboarding_skip">Skip for now</string>
     <string name="onboarding_done">Get Started</string>
-    <string name="onboarding_about_title">Tell Deskdrop about yourself</string>
-    <string name="onboarding_about_subtitle">This helps the AI write in your style and language. You can change this anytime in Settings.</string>
-    <string name="onboarding_about_hint">e.g. My name is Alex. I usually write in English. Keep my messages short and casual.</string>
+    <string name="onboarding_about_title">Make AI write like you (optional)</string>
+    <string name="onboarding_about_subtitle">Makes AI responses sound more like you</string>
+    <string name="onboarding_about_hint">e.g. Write in Dutch. Keep it short and casual. Be professional in emails.</string>
     <string name="onboarding_cloud_hint">You can also use cloud AI models. Configure them in Settings &gt; AI.</string>
     <string name="ai_instruction_label">AI Instruction</string>
     <string name="ai_instruction_summary">The prompt sent to the AI along with your text</string>
