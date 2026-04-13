@@ -13,6 +13,9 @@ An Android keyboard with built-in AI powered by your own local server. Connect t
 
 https://github.com/user-attachments/assets/f9835142-7861-4093-a49f-de66a2b9e0d9
 
+<details>
+<summary>More demos</summary>
+
 **Inline // syntax** - Type instructions directly after your text
 
 https://github.com/user-attachments/assets/9aed41b8-5524-41ef-9fa7-33618d7fcd84
@@ -32,6 +35,8 @@ https://github.com/user-attachments/assets/1827cb16-48af-412b-a9a3-d87413f054cb
 **MCP (Home Assistant)** - Control your smart home from your keyboard
 
 https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
+
+</details>
 
 ## Features
 
