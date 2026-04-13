@@ -119,6 +119,7 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
 4. Tap **Test connection** to verify
 5. Pick a model from the list
 6. Optional: set an alternate connection for Tailscale or LAN access
+7. The AI demo lets you test your setup before finishing
 
 Both paths include an optional personalization step where you can tell the AI about your writing style and language preferences. This helps AI responses sound more like you.
 
