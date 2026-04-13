@@ -150,7 +150,7 @@ fun WelcomeWizard(
                 }
                 step = when (selectedMode) {
                     "local" -> if (!setupDone) { selectedMode = "cloud"; 4 } else { finish(); return@launch }
-                    else -> 10 // Quick start → "You're all set"
+                    else -> 11 // Quick start → Groq setup
                 }
             }
     }
@@ -428,7 +428,7 @@ fun WelcomeWizard(
                     onClick = {
                         val setupStep = determineSetupStep()
                         step = if (setupStep == -1 || setupStep == 4) {
-                            if (selectedMode == "local") { selectedMode = "cloud"; 4 } else 10
+                            if (selectedMode == "local") { selectedMode = "cloud"; 4 } else 11
                         } else setupStep
                     },
                     Modifier.fillMaxWidth().height(52.dp),
@@ -448,7 +448,7 @@ fun WelcomeWizard(
                 val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
                     val nextStep = determineSetupStep()
                     step = if (nextStep == -1 || nextStep == 4) {
-                        if (selectedMode == "local") { selectedMode = "cloud"; 4 } else 10
+                        if (selectedMode == "local") { selectedMode = "cloud"; 4 } else 11
                     } else nextStep
                 }
                 if (step == 2) {
@@ -624,7 +624,7 @@ fun WelcomeWizard(
 
                         Spacer(Modifier.height(24.dp))
                         Button(
-                            onClick = { step = 7 },
+                            onClick = { step = 8 },
                             Modifier.fillMaxWidth(),
                             enabled = selectedOllamaModel.isNotBlank() && ollamaStatus is OllamaStatus.Connected,
                             colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
@@ -688,7 +688,7 @@ fun WelcomeWizard(
 
                         Spacer(Modifier.height(24.dp))
                         Button(
-                            onClick = { step = 7 },
+                            onClick = { step = 8 },
                             Modifier.fillMaxWidth(),
                             enabled = groqApiKey.isNotBlank() || geminiApiKey.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
@@ -874,7 +874,7 @@ fun WelcomeWizard(
                             ) { Text("Skip") }
                         }
                         Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { step = 7 }, Modifier.fillMaxWidth()) { Text("Back") }
+                        OutlinedButton(onClick = { step = if (selectedMode == "local") 5 else 6 }, Modifier.fillMaxWidth()) { Text("Back") }
                     }
 
                     // Step 9: Have fun (Advanced done)
@@ -965,6 +965,47 @@ fun WelcomeWizard(
                             colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
                         ) {
                             Text("Got it!", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        }
+                    }
+
+                    // Step 11: Quick Start — Groq API key
+                    11 -> {
+                        var showQuickGroqKeyDialog by rememberSaveable { mutableStateOf(false) }
+
+                        Text("Add AI to your keyboard", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Get a free Groq API key to enable AI features",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        Spacer(Modifier.height(24.dp))
+
+                        SettingRow("Paste your API key", if (groqApiKey.isBlank()) "(not set)" else "\u2022".repeat(minOf(groqApiKey.length, 20))) { showQuickGroqKeyDialog = true }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/"))) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Get free Groq API key", color = DeskdropTeal) }
+
+                        Spacer(Modifier.height(24.dp))
+                        Button(
+                            onClick = { step = 10 },
+                            Modifier.fillMaxWidth().height(52.dp),
+                            enabled = groqApiKey.isNotBlank(),
+                            colors = ButtonDefaults.buttonColors(containerColor = DeskdropTeal)
+                        ) { Text("Continue", style = MaterialTheme.typography.titleMedium, color = Color.White) }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { step = 10 },
+                            Modifier.fillMaxWidth()
+                        ) { Text("Skip for now") }
+
+                        if (showQuickGroqKeyDialog) {
+                            TextInputDialog(
+                                onDismissRequest = { showQuickGroqKeyDialog = false },
+                                onConfirmed = { groqApiKey = it; showQuickGroqKeyDialog = false },
+                                initialText = groqApiKey,
+                                title = { Text("Groq API Key") },
+                                checkTextValid = { it.isNotBlank() },
+                            )
                         }
                     }
                 }
