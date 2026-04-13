@@ -87,13 +87,40 @@ An Android keyboard with built-in AI powered by your own local server. Connect t
 **Home screen widget**
 - Quick access bar with Voice, Chat, and Execute buttons
 
-## Quick start
+## Getting started
 
-1. Install the APK
-2. Enable Deskdrop as your keyboard in Android Settings > System > Keyboard
-3. Open Deskdrop Settings and run the setup wizard
-4. Enter your Ollama server URL (Tailscale IP or LAN address) or a cloud API key
-5. Done. Tap the AI Assist button on the toolbar to start
+Install the APK, open Deskdrop, and the setup wizard walks you through everything.
+
+### Quick Start (no setup needed)
+
+1. Install the APK and open Deskdrop
+2. Tap **Try it now**
+3. Choose **Quick Start**
+4. Turn on Deskdrop in your keyboard settings
+5. Switch to Deskdrop as your active keyboard
+6. Done. You can start using AI right away
+
+### Advanced Setup
+
+Choose **Advanced Setup** if you want to connect your own models or use a specific cloud provider.
+
+**Cloud path (Groq / Gemini)**
+
+1. Choose **Cloud** on the setup screen
+2. Get a free API key from Groq or Gemini
+3. Paste your key and continue
+4. The AI demo lets you test your connection before finishing
+
+**Local path (Ollama)**
+
+1. Make sure Ollama is running on your computer
+2. Choose **Local** on the setup screen
+3. Enter your Ollama URL (default: `http://localhost:11434`)
+4. Tap **Test connection** to verify
+5. Pick a model from the list
+6. Optional: set an alternate connection for Tailscale or LAN access
+
+After setup, the wizard lets you personalize your AI and test it live before you start.
 
 ## Supported backends
 
