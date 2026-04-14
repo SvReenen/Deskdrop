@@ -363,10 +363,10 @@ object AiServiceSync {
         "Llama 4 Scout (Groq)" to "groq:meta-llama/llama-4-scout-17b-16e-instruct",
         "Llama 3.3 70B (Groq)" to "groq:llama-3.3-70b-versatile",
         "Gemma 2 9B (Groq)" to "groq:gemma2-9b-it",
+        "Gemma 4 26B (OpenRouter)" to "openrouter:google/gemma-4-26b-a4b-it:free",
         "Gemma 3 27B (OpenRouter)" to "openrouter:google/gemma-3-27b-it:free",
-        "Llama 4 Scout (OpenRouter)" to "openrouter:meta-llama/llama-4-scout:free",
-        "Mistral Small 24B (OpenRouter)" to "openrouter:mistralai/mistral-small-3.1-24b-instruct:free",
-        "Qwen3 30B (OpenRouter)" to "openrouter:qwen/qwen3-30b-a3b:free",
+        "Llama 3.3 70B (OpenRouter)" to "openrouter:meta-llama/llama-3.3-70b-instruct:free",
+        "Qwen3 Coder (OpenRouter)" to "openrouter:qwen/qwen3-coder:free",
     )
 
     /**

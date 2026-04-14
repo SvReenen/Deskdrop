@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Android 9.0+](https://img.shields.io/badge/Android-9.0%2B-brightgreen.svg)]()
-[![Release](https://img.shields.io/badge/Release-v1.1.0-orange.svg)](https://github.com/SvReenen/Deskdrop/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v1.1.1-orange.svg)](https://github.com/SvReenen/Deskdrop/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/SvReenen/Deskdrop/total?color=blue)](https://github.com/SvReenen/Deskdrop/releases/latest)
 
 An Android keyboard with built-in AI powered by your own local server. Connect to Ollama, LM Studio, or any OpenAI-compatible backend over Tailscale or LAN. Cloud providers available as fallback or standalone.
