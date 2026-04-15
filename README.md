@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Android 9.0+](https://img.shields.io/badge/Android-9.0%2B-brightgreen.svg)]()
-[![Release](https://img.shields.io/badge/Release-v1.1.1-orange.svg)](https://github.com/SvReenen/Deskdrop/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v1.2.0-orange.svg)](https://github.com/SvReenen/Deskdrop/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/SvReenen/Deskdrop/total?color=blue)](https://github.com/SvReenen/Deskdrop/releases/latest)
 
 An Android keyboard with built-in AI powered by your own local server. Connect to Ollama, LM Studio, or any OpenAI-compatible backend over Tailscale or LAN. Cloud providers available as fallback or standalone.
@@ -52,8 +52,11 @@ https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
 
 **AI shortcuts**
 - AI Assist: rewrite, translate, or transform selected text with a single tap
+- AI Tone: one-tap tone adjustment (Formal, Casual, Friendly, Shorter, Longer, Grammar, Dutch, English) with customizable chips
+- AI Preview Panel: see results before applying, with retry, copy, and dismiss options
 - 4 configurable shortcut slots, each with its own model and instruction
-- Inline instructions with `//` syntax (e.g. type text followed by `//make shorter`)
+- Inline commands with `//` syntax (e.g. `//formal`, `//grammar`, `//shorten`) with command chaining
+- Clipboard context: copy a message, type your reply, AI uses the context automatically
 - AI Clipboard: process clipboard content through AI
 - Undo: tap again after AI processing to restore original text
 
