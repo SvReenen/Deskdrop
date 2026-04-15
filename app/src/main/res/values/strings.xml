@@ -471,6 +471,7 @@
     <string name="ai_voice" tools:keep="@string/ai_voice">AI Voice</string>
     <string name="ai_conversation" tools:keep="@string/ai_conversation">AI Conversation</string>
     <string name="ai_actions" tools:keep="@string/ai_actions">AI Actions</string>
+    <string name="ai_tone" tools:keep="@string/ai_tone">AI Tone</string>
     <string name="ai_slot_unconfigured">Long-press to assign a model</string>
     <!-- Title of the setting to set clipboard toolbar keys -->
     <string name="clipboard_toolbar_keys">Select clipboard toolbar keys</string>

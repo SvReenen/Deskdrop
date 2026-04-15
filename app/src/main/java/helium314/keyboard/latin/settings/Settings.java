@@ -100,6 +100,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_AI_VOICE_CUSTOM_MODES = "ai_voice_custom_modes";
     public static final String PREF_AI_VOICE_ENGINE = "ai_voice_engine";
     public static final String PREF_AI_MCP_MODEL = "ai_mcp_model";
+    public static final String PREF_AI_PROMPT_ALIASES = "ai_prompt_aliases";
+    public static final String PREF_AI_TONE_CHIPS = "ai_tone_chips";
 
     public static final String PREF_WHISPER_URL = "whisper_url";
     public static final String PREF_WHISPER_URL_FALLBACK = "whisper_url_fallback";

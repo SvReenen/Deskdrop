@@ -547,6 +547,26 @@ object AiServiceSync {
     @JvmStatic
     fun clearModelCache() { customModelCache.clear() }
 
+    /**
+     * Resolve a single instruction keyword against saved prompt aliases.
+     * Returns the full prompt if an alias matches (case-insensitive), or the original instruction otherwise.
+     */
+    private fun resolveAlias(instruction: String, prefs: SharedPreferences): String {
+        var json = prefs.getString(Settings.PREF_AI_PROMPT_ALIASES, Defaults.PREF_AI_PROMPT_ALIASES) ?: return instruction
+        // Fall back to defaults if stored value is empty
+        if (json == "[]") json = Defaults.PREF_AI_PROMPT_ALIASES
+        return try {
+            val arr = org.json.JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                if (obj.getString("name").equals(instruction, ignoreCase = true)) {
+                    return obj.getString("prompt")
+                }
+            }
+            instruction
+        } catch (_: Exception) { instruction }
+    }
+
     @JvmStatic
     @JvmOverloads
     fun processInline(
@@ -557,8 +577,36 @@ object AiServiceSync {
     ): String {
         checkCloudFallback(prefs)
         val aiModel = prefs.getString(Settings.PREF_AI_MODEL, Defaults.PREF_AI_MODEL) ?: Defaults.PREF_AI_MODEL
-        val prompt = if (content.isBlank()) instruction else "$instruction\n\nText:\n$content"
 
+        // Support chaining: "formal //translate" splits into ["formal", "translate"]
+        val steps = instruction.split("//").map { it.trim() }.filter { it.isNotEmpty() }
+
+        if (steps.size > 1) {
+            var intermediate = content
+            for (step in steps) {
+                if (AiCancelRegistry.isCancelled(cancelHandle)) return "[Cancelled]"
+                val resolved = resolveAlias(step, prefs)
+                val chainSuffix = "\n\nReturn ONLY the result. No alternatives, no explanation, one version only."
+                val stepPrompt = if (intermediate.isBlank()) resolved + chainSuffix
+                    else "$resolved$chainSuffix\n\nText:\n$intermediate"
+                intermediate = callWithModel(stepPrompt, aiModel, prefs, cancelHandle).trim()
+                if (intermediate.startsWith("[") && intermediate.endsWith("]")) return intermediate // error
+            }
+            return intermediate
+        }
+
+        val resolved = resolveAlias(instruction, prefs)
+        val prompt = if (content.isBlank()) resolved else "$resolved\n\nText:\n$content"
+        return callWithModel(prompt, aiModel, prefs, cancelHandle)
+    }
+
+    /** Dispatch a prompt to the appropriate backend based on the model string. */
+    private fun callWithModel(
+        prompt: String,
+        aiModel: String,
+        prefs: SharedPreferences,
+        cancelHandle: AiCancelRegistry.CancelHandle? = null
+    ): String {
         val colonIndex = aiModel.indexOf(':')
         if (colonIndex > 0) {
             val backend = aiModel.substring(0, colonIndex)
@@ -566,7 +614,7 @@ object AiServiceSync {
             return when (backend) {
                 "onnx" -> {
                     val ctx = appContext ?: return "[ONNX: no context available]"
-                    OnnxInferenceService.process("$instruction: $content", ctx, cancelHandle)
+                    OnnxInferenceService.process(prompt, ctx, cancelHandle)
                 }
                 "ollama" -> callOllama(prompt, model, prefs, cancelHandle)
                 "gemini" -> callGemini(prompt, model, prefs, cancelHandle)
@@ -595,7 +643,7 @@ object AiServiceSync {
                 else -> callGemini(prompt, model, prefs, cancelHandle)
             }
         }
-        return "[Invalid inline model: $aiModel]"
+        return "[Invalid model: $aiModel]"
     }
 
     @JvmStatic

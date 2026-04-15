@@ -117,8 +117,17 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                         }
                     else {
                         SettingsNavHost(onClickBack = { this.finish() })
+                        val lastSeenVersion = prefs.getString("whats_new_seen_version", "")
+                        var showWhatsNew by rememberSaveable { mutableStateOf(
+                            lastSeenVersion != WHATS_NEW_VERSION && setupV2
+                        ) }
                         if (showWelcomeWizard) {
                             WelcomeWizard(close = { showWelcomeWizard = false }, finish = this::finish)
+                        } else if (showWhatsNew) {
+                            WhatsNewDialog(onDismiss = {
+                                showWhatsNew = false
+                                prefs.edit().putString("whats_new_seen_version", WHATS_NEW_VERSION).apply()
+                            })
                         } else if (crashReports.isNotEmpty()) {
                             ConfirmationDialog(
                                 cancelButtonText = "ignore",

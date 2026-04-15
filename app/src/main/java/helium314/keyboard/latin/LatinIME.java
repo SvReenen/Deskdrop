@@ -1466,6 +1466,197 @@ public class LatinIME extends InputMethodService implements
         }
     }
 
+    private String[][] loadToneChips() {
+        android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+        String json = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_TONE_CHIPS,
+            helium314.keyboard.latin.settings.Defaults.PREF_AI_TONE_CHIPS);
+        if (json == null || json.equals("[]")) json = helium314.keyboard.latin.settings.Defaults.PREF_AI_TONE_CHIPS;
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray(json);
+            String[][] chips = new String[arr.length()][2];
+            for (int i = 0; i < arr.length(); i++) {
+                org.json.JSONObject obj = arr.getJSONObject(i);
+                chips[i][0] = obj.getString("name");
+                chips[i][1] = obj.getString("prompt");
+            }
+            return chips;
+        } catch (Exception e) {
+            return new String[][]{{"Formal", "Rewrite this text in a more formal and professional tone. Return only the rewritten text, nothing else."}};
+        }
+    }
+
+    public void showAiPreview(String text) {
+        showAiPreview(text, null);
+    }
+
+    public void showAiPreview(String text, String clipboardContext) {
+        KeyboardSwitcher.getInstance().showAiPreview(text);
+        // Show clipboard context indicator
+        View panel = KeyboardSwitcher.getInstance().getAiPreviewPanel();
+        if (panel != null) {
+            android.widget.TextView contextLabel = panel.findViewById(R.id.ai_preview_context_label);
+            if (contextLabel != null) {
+                if (clipboardContext != null && !clipboardContext.isEmpty()) {
+                    String preview = clipboardContext.replace('\n', ' ');
+                    if (preview.length() > 60) preview = preview.substring(0, 57) + "...";
+                    contextLabel.setText("\u2715  \uD83D\uDCCB  " + preview);
+                    contextLabel.setVisibility(View.VISIBLE);
+                    contextLabel.setClickable(true);
+                    contextLabel.setFocusable(true);
+                    // Fade in
+                    contextLabel.setAlpha(0f);
+                    contextLabel.animate().alpha(1f).setDuration(400).start();
+                    // Dismiss clipboard context on click
+                    contextLabel.setOnClickListener(cv -> {
+                        contextLabel.animate().alpha(0f).setDuration(200).withEndAction(() -> {
+                            contextLabel.setVisibility(View.GONE);
+                        }).start();
+                        // Remember dismissed text so we don't show it again
+                        mDismissedClipboardText = clipboardContext;
+                        // Clear the stored context so chips won't use it
+                        mLastClipboardContext = null;
+                    });
+                    mLastClipboardContext = clipboardContext;
+                } else {
+                    contextLabel.setVisibility(View.GONE);
+                    mLastClipboardContext = null;
+                }
+            }
+        }
+    }
+
+    public void showAiPreviewInstant(String text) {
+        KeyboardSwitcher.getInstance().showAiPreviewInstant(text);
+    }
+
+    public void hideAiPreview() {
+        KeyboardSwitcher.getInstance().hideAiPreview();
+    }
+
+    public void startAiShimmer() {
+        KeyboardSwitcher.getInstance().startShimmer();
+    }
+
+    public void stopAiShimmer() {
+        KeyboardSwitcher.getInstance().stopShimmer();
+    }
+
+    public void setupAiPreviewButtons(Runnable onApply, Runnable onRetry, Runnable onDismiss, Runnable onEdit, String resultText) {
+        setupAiPreviewButtons(onApply, onRetry, onDismiss, onEdit, resultText, null);
+    }
+
+    public void setupAiPreviewButtons(Runnable onApply, Runnable onRetry, Runnable onDismiss, Runnable onEdit, String resultText, String clipboardContext) {
+        View panel = KeyboardSwitcher.getInstance().getAiPreviewPanel();
+        if (panel == null) return;
+        View applyBtn = panel.findViewById(R.id.ai_preview_apply);
+        applyBtn.setOnClickListener(v -> {
+            v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(80).withEndAction(() -> {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
+                onApply.run();
+            }).start();
+        });
+        panel.findViewById(R.id.ai_preview_retry).setOnClickListener(v -> onRetry.run());
+        panel.findViewById(R.id.ai_preview_dismiss).setOnClickListener(v -> onDismiss.run());
+        panel.findViewById(R.id.ai_preview_edit).setOnClickListener(v -> onEdit.run());
+        panel.findViewById(R.id.ai_preview_copy).setOnClickListener(v -> {
+            android.content.ClipboardManager cb = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cb != null) cb.setPrimaryClip(android.content.ClipData.newPlainText("AI result", resultText));
+            android.widget.Toast.makeText(this, "Copied", android.widget.Toast.LENGTH_SHORT).show();
+        });
+
+        // Setup tone chips
+        android.widget.LinearLayout chipsContainer = panel.findViewById(R.id.ai_preview_chips);
+        chipsContainer.removeAllViews();
+        final String[] currentResult = {resultText};
+        for (String[] tone : loadToneChips()) {
+            android.widget.TextView chip = new android.widget.TextView(this);
+            chip.setText(tone[0]);
+            chip.setTextSize(13);
+            chip.setTextColor(0xB3FFFFFF);
+            chip.setPadding(dp(12), dp(6), dp(12), dp(6));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(dp(16));
+            bg.setStroke(dp(1), 0x40FFFFFF);
+            bg.setColor(0x1AFFFFFF);
+            chip.setBackground(bg);
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            lp.setMarginEnd(dp(6));
+            chip.setLayoutParams(lp);
+            chip.setClickable(true);
+            chip.setFocusable(true);
+            final String tonePrompt = tone[1];
+            chip.setOnClickListener(v -> {
+                // Bounce animation on press
+                chip.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100).withEndAction(() ->
+                    chip.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                ).start();
+                // Highlight selected chip, dim others
+                for (int i = 0; i < chipsContainer.getChildCount(); i++) {
+                    View c = chipsContainer.getChildAt(i);
+                    c.setAlpha(c == chip ? 1f : 0.4f);
+                    c.setEnabled(false);
+                }
+                // Build prompt with clipboard context if available (and not dismissed)
+                String fullPrompt = tonePrompt;
+                if (mLastClipboardContext != null && !mLastClipboardContext.isEmpty()) {
+                    fullPrompt = tonePrompt
+                        + "\n\nThe user is replying to the following message. Use it to understand the context and adjust the reply accordingly, but ONLY return the rewritten version of the user's text. Do NOT include the original message or any additional commentary."
+                        + "\n\nMessage being replied to:\n\"\"\"" + mLastClipboardContext + "\"\"\"";
+                }
+                final String fFullPrompt = fullPrompt;
+                // Track last tone for retry
+                mLastTonePrompt = fFullPrompt;
+                mLastToneInput = currentResult[0];
+                // Start shimmer while processing
+                startAiShimmer();
+                android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+                new Thread(() -> {
+                    String adjusted = helium314.keyboard.latin.ai.AiServiceSync.processInline(
+                        currentResult[0], fFullPrompt, prefs, null);
+                    mHandler.post(() -> {
+                        stopAiShimmer();
+                        // Re-enable all chips
+                        for (int i = 0; i < chipsContainer.getChildCount(); i++) {
+                            View c = chipsContainer.getChildAt(i);
+                            c.setAlpha(1f);
+                            c.setEnabled(true);
+                        }
+                        currentResult[0] = adjusted;
+                        // Typewriter the new result
+                        showAiPreviewInstant(adjusted);
+                        // Update apply and copy to use new result
+                        panel.findViewById(R.id.ai_preview_apply).setOnClickListener(av -> {
+                            onApply.run();
+                        });
+                        panel.findViewById(R.id.ai_preview_copy).setOnClickListener(cv -> {
+                            android.content.ClipboardManager cb2 = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                            if (cb2 != null) cb2.setPrimaryClip(android.content.ClipData.newPlainText("AI result", currentResult[0]));
+                            android.widget.Toast.makeText(this, "Copied", android.widget.Toast.LENGTH_SHORT).show();
+                        });
+                    });
+                }).start();
+            });
+            chipsContainer.addView(chip);
+        }
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density);
+    }
+
+    private String mLastTonePrompt;
+    private String mLastToneInput;
+    private String mLastClipboardContext;
+    private String mDismissedClipboardText;
+
+    public String getDismissedClipboardText() { return mDismissedClipboardText; }
+
+    public String getLastTonePrompt() { return mLastTonePrompt; }
+    public String getLastToneInput() { return mLastToneInput; }
+
     private android.speech.SpeechRecognizer mSpeechRecognizer;
     private helium314.keyboard.latin.ai.WhisperRecorder mWhisperRecorder;
     private volatile boolean mWhisperTranscribing = false;

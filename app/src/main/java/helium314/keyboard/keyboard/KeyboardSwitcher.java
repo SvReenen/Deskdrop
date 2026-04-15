@@ -69,6 +69,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private SuggestionStripView mSuggestionStripView;
     private FrameLayout mStripContainer;
     private ClipboardHistoryView mClipboardHistoryView;
+    private View mAiPreviewPanel;
+    private TextView mAiPreviewText;
     private TextView mFakeToastView;
     private LatinIME mLatinIME;
     private RichInputMethodManager mRichImm;
@@ -341,6 +343,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mSuggestionStripView.setVisibility(stripVisibility);
         mClipboardHistoryView.setVisibility(View.GONE);
         mClipboardHistoryView.stopClipboardHistory();
+        if (mAiPreviewPanel != null) mAiPreviewPanel.setVisibility(View.GONE);
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -717,6 +720,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mMainKeyboardFrame = mCurrentInputView.findViewById(R.id.main_keyboard_frame);
         mEmojiPalettesView = mCurrentInputView.findViewById(R.id.emoji_palettes_view);
         mClipboardHistoryView = mCurrentInputView.findViewById(R.id.clipboard_history_view);
+        mAiPreviewPanel = mCurrentInputView.findViewById(R.id.ai_preview_panel);
+        mAiPreviewText = mCurrentInputView.findViewById(R.id.ai_preview_text);
         mFakeToastView = mCurrentInputView.findViewById(R.id.fakeToast);
 
         mKeyboardViewWrapper = mCurrentInputView.findViewById(R.id.keyboard_view_wrapper);
@@ -779,5 +784,173 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         } catch (IllegalStateException e) {
             // in tests isInputViewShown returns true, but showWindow throws "IllegalStateException: Window token is not set yet."
         }
+    }
+
+    private android.animation.ValueAnimator mGlowAnimator;
+    private android.animation.ValueAnimator mShimmerAnimator;
+
+    public void showAiPreview(String text) {
+        if (mAiPreviewPanel == null || mAiPreviewText == null) return;
+
+        // Match the keyboard height exactly
+        int keyboardHeight = mKeyboardView.getHeight();
+        if (keyboardHeight > 0) {
+            android.view.ViewGroup.LayoutParams lp = mAiPreviewPanel.getLayoutParams();
+            lp.height = keyboardHeight;
+            mAiPreviewPanel.setLayoutParams(lp);
+        }
+
+        // Use keyboard background color
+        mAiPreviewPanel.setBackground(mKeyboardView.getBackground());
+
+        mAiPreviewText.setText("");
+        mKeyboardView.setVisibility(View.GONE);
+        mEmojiPalettesView.setVisibility(View.GONE);
+        mClipboardHistoryView.setVisibility(View.GONE);
+        if (mSuggestionStripView != null) mSuggestionStripView.setVisibility(View.GONE);
+        if (mStripContainer != null) mStripContainer.setVisibility(View.GONE);
+        mAiPreviewPanel.setVisibility(View.VISIBLE);
+
+        // Slide-up animation
+        mAiPreviewPanel.setTranslationY(keyboardHeight > 0 ? keyboardHeight : 300);
+        mAiPreviewPanel.setAlpha(0f);
+        mAiPreviewPanel.animate()
+            .translationY(0)
+            .alpha(1f)
+            .setDuration(300)
+            .setInterpolator(new android.view.animation.DecelerateInterpolator(2f))
+            .start();
+
+        // Animated glow border (teal gradient sweep)
+        startGlowAnimation();
+
+        // Typewriter effect
+        typewriteText(text, mAiPreviewText);
+    }
+
+    public void showAiPreviewInstant(String text) {
+        if (mAiPreviewText == null) return;
+        typewriteText(text, mAiPreviewText);
+    }
+
+    public void hideAiPreview() {
+        if (mAiPreviewPanel == null) return;
+        stopGlowAnimation();
+        stopShimmer();
+
+        // Slide-down + fade out
+        mAiPreviewPanel.animate()
+            .translationY(100)
+            .alpha(0f)
+            .setDuration(200)
+            .setInterpolator(new android.view.animation.AccelerateInterpolator(2f))
+            .withEndAction(() -> {
+                mAiPreviewPanel.setVisibility(View.GONE);
+                mAiPreviewPanel.setTranslationY(0);
+                mAiPreviewPanel.setAlpha(1f);
+                mKeyboardView.setVisibility(View.VISIBLE);
+                if (mSuggestionStripView != null) mSuggestionStripView.setVisibility(View.VISIBLE);
+                if (mStripContainer != null) mStripContainer.setVisibility(View.VISIBLE);
+            })
+            .start();
+    }
+
+    private void typewriteText(String fullText, TextView target) {
+        if (mTypewriterRunnable != null) {
+            target.removeCallbacks(mTypewriterRunnable);
+        }
+        final int len = fullText.length();
+        // Target: complete in ~800ms, tick every 16ms (~60fps)
+        final int totalTicks = Math.max(10, Math.min(50, 800 / 16));
+        final int charsPerTick = Math.max(1, (len + totalTicks - 1) / totalTicks);
+        final int[] index = {0};
+        mTypewriterRunnable = new Runnable() {
+            @Override
+            public void run() {
+                index[0] = Math.min(index[0] + charsPerTick, len);
+                target.setText(fullText.subSequence(0, index[0]));
+                if (index[0] < len) {
+                    target.postDelayed(this, 16);
+                } else {
+                    mTypewriterRunnable = null;
+                }
+            }
+        };
+        target.post(mTypewriterRunnable);
+    }
+    private Runnable mTypewriterRunnable;
+
+    public void startShimmer() {
+        if (mAiPreviewPanel == null) return;
+        View shimmer = mAiPreviewPanel.findViewById(R.id.ai_preview_shimmer);
+        if (shimmer == null) return;
+
+        int w = mAiPreviewPanel.getWidth();
+        if (w <= 0) w = 1000;
+        android.graphics.drawable.GradientDrawable shimmerBg = new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+            new int[]{0x00000000, 0x331A9E8F, 0x00000000}
+        );
+        shimmer.setBackground(shimmerBg);
+        shimmer.setVisibility(View.VISIBLE);
+
+        final int totalW = w;
+        if (mShimmerAnimator != null) mShimmerAnimator.cancel();
+        mShimmerAnimator = android.animation.ValueAnimator.ofFloat(-1f, 2f);
+        mShimmerAnimator.setDuration(1500);
+        mShimmerAnimator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        mShimmerAnimator.setInterpolator(new android.view.animation.LinearInterpolator());
+        mShimmerAnimator.addUpdateListener(anim -> {
+            float val = (float) anim.getAnimatedValue();
+            shimmer.setTranslationX(val * totalW);
+        });
+        mShimmerAnimator.start();
+    }
+
+    public void stopShimmer() {
+        if (mShimmerAnimator != null) {
+            mShimmerAnimator.cancel();
+            mShimmerAnimator = null;
+        }
+        if (mAiPreviewPanel != null) {
+            View shimmer = mAiPreviewPanel.findViewById(R.id.ai_preview_shimmer);
+            if (shimmer != null) shimmer.setVisibility(View.GONE);
+        }
+    }
+
+    private void startGlowAnimation() {
+        View glow = mAiPreviewPanel.findViewById(R.id.ai_preview_glow);
+        if (glow == null) return;
+
+        android.graphics.drawable.GradientDrawable glowBg = new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+            new int[]{0xFF1A9E8F, 0xFF2BC4B4, 0xFF1A9E8F}
+        );
+        glow.setBackground(glowBg);
+
+        if (mGlowAnimator != null) mGlowAnimator.cancel();
+        mGlowAnimator = android.animation.ValueAnimator.ofFloat(0.3f, 1f, 0.3f);
+        mGlowAnimator.setDuration(2000);
+        mGlowAnimator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        mGlowAnimator.setInterpolator(new android.view.animation.LinearInterpolator());
+        mGlowAnimator.addUpdateListener(anim -> {
+            glow.setAlpha((float) anim.getAnimatedValue());
+        });
+        mGlowAnimator.start();
+    }
+
+    private void stopGlowAnimation() {
+        if (mGlowAnimator != null) {
+            mGlowAnimator.cancel();
+            mGlowAnimator = null;
+        }
+        if (mAiPreviewPanel != null) {
+            View glow = mAiPreviewPanel.findViewById(R.id.ai_preview_glow);
+            if (glow != null) glow.setAlpha(0f);
+        }
+    }
+
+    public View getAiPreviewPanel() {
+        return mAiPreviewPanel;
     }
 }

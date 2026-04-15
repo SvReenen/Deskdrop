@@ -105,6 +105,7 @@ object KeyCode {
     const val AI_VOICE =                    -309
     const val AI_CONVERSATION =             -310
     const val AI_ACTIONS =                  -311
+    const val AI_TONE =                     -312
 
     const val CURRENCY_SLOT_1 =             -801
     const val CURRENCY_SLOT_2 =             -802

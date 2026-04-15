@@ -747,6 +747,27 @@ public final class RichInputConnection implements PrivateCommandPerformer {
         return reloadTextCache();
     }
 
+    /** Replace all text in the field atomically using synchronous setSelection */
+    public void replaceAllText(final String newText) {
+        if (!isConnected()) return;
+        finishComposingText();
+        final CharSequence before = getTextBeforeCursor(100000, 0);
+        final CharSequence after = getTextAfterCursor(100000, 0);
+        final int total = (before != null ? before.length() : 0) + (after != null ? after.length() : 0);
+        if (total > 0) {
+            mIC.beginBatchEdit();
+            mIC.setSelection(0, total);
+            mIC.commitText(newText, 1);
+            mIC.endBatchEdit();
+        } else {
+            commitText(newText, 1);
+        }
+        mCommittedTextBeforeComposingText.setLength(0);
+        mCommittedTextBeforeComposingText.append(newText);
+        mExpectedSelStart = newText.length();
+        mExpectedSelEnd = newText.length();
+    }
+
     public void selectAll() {
         if (!isConnected()) return;
         if (mExpectedSelStart != mExpectedSelEnd && mExpectedSelStart == 0 && !hasTextAfterCursor()) { // all text already selected

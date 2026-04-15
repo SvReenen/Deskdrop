@@ -501,6 +501,12 @@ private fun GeneralTab(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
+                // Prompt Aliases (collapsible, under Base Model Instruction)
+                PromptAliasesSection(prefs, teal)
+
+                // Tone Chips (collapsible)
+                ToneChipsSection(prefs, teal)
+
                 // Internet tools
                 helium314.keyboard.settings.preferences.SwitchPreference(
                     name = "Internet tools",
@@ -565,6 +571,375 @@ private fun GeneralTab(
         }
 
     }
+}
+
+// ── Tone Chips ──────────────────────────────────────────────────────────
+
+@Composable
+private fun ToneChipsSection(prefs: android.content.SharedPreferences, teal: Color) {
+    val storedJson = prefs.getString(Settings.PREF_AI_TONE_CHIPS, Defaults.PREF_AI_TONE_CHIPS) ?: "[]"
+    val chipsJson = if (storedJson == "[]") Defaults.PREF_AI_TONE_CHIPS else storedJson
+    val chips = remember(chipsJson) {
+        mutableStateListOf<Pair<String, String>>().also { list ->
+            try {
+                val arr = org.json.JSONArray(chipsJson)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    list.add(obj.getString("name") to obj.getString("prompt"))
+                }
+            } catch (_: Exception) {}
+        }
+    }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editIndex by remember { mutableIntStateOf(-1) }
+    var chipsExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { chipsExpanded = !chipsExpanded }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Tone Chips",
+                style = MaterialTheme.typography.titleSmall,
+                color = teal,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Quick-access buttons in the AI preview panel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+        }
+        Text(
+            if (chipsExpanded) "▲" else "▼",
+            color = teal,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+
+    AnimatedVisibility(visible = chipsExpanded) {
+        Column {
+            chips.forEachIndexed { index, (name, prompt) ->
+                BrandCard(
+                    modifier = Modifier.padding(vertical = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { editIndex = index },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                prompt,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2
+                            )
+                        }
+                        Text(
+                            "\u2715",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .clickable {
+                                    chips.removeAt(index)
+                                    saveToneChips(prefs, chips)
+                                }
+                                .padding(8.dp)
+                        )
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = { showAddDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Text("+ Add tone chip")
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        ToneChipDialog(
+            onDismiss = { showAddDialog = false },
+            onSave = { name, prompt ->
+                chips.add(name to prompt)
+                saveToneChips(prefs, chips)
+                showAddDialog = false
+            }
+        )
+    }
+
+    if (editIndex >= 0 && editIndex < chips.size) {
+        val (editName, editPrompt) = chips[editIndex]
+        ToneChipDialog(
+            initialName = editName,
+            initialPrompt = editPrompt,
+            onDismiss = { editIndex = -1 },
+            onSave = { name, prompt ->
+                chips[editIndex] = name to prompt
+                saveToneChips(prefs, chips)
+                editIndex = -1
+            }
+        )
+    }
+}
+
+private fun saveToneChips(prefs: android.content.SharedPreferences, chips: List<Pair<String, String>>) {
+    val arr = org.json.JSONArray()
+    for ((name, prompt) in chips) {
+        val obj = org.json.JSONObject()
+        obj.put("name", name)
+        obj.put("prompt", prompt)
+        arr.put(obj)
+    }
+    prefs.edit().putString(Settings.PREF_AI_TONE_CHIPS, arr.toString()).apply()
+}
+
+@Composable
+private fun ToneChipDialog(
+    initialName: String = "",
+    initialPrompt: String = "",
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var prompt by remember { mutableStateOf(initialPrompt) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialName.isEmpty()) "New Tone Chip" else "Edit Tone Chip") },
+        text = {
+            Column {
+                androidx.compose.material3.OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Button label (e.g. Formal)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = prompt,
+                    onValueChange = { prompt = it },
+                    label = { Text("Prompt") },
+                    placeholder = { Text("Rewrite this text in a formal tone. Return only the rewritten text.") },
+                    minLines = 3,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (name.isNotBlank() && prompt.isNotBlank()) onSave(name.trim(), prompt.trim()) },
+                enabled = name.isNotBlank() && prompt.isNotBlank()
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+// ── Prompt Aliases ──────────────────────────────────────────────────────
+
+@Composable
+private fun PromptAliasesSection(prefs: android.content.SharedPreferences, teal: Color) {
+    val storedJson = prefs.getString(Settings.PREF_AI_PROMPT_ALIASES, Defaults.PREF_AI_PROMPT_ALIASES) ?: "[]"
+    val aliasesJson = if (storedJson == "[]") Defaults.PREF_AI_PROMPT_ALIASES else storedJson
+    val aliases = remember(aliasesJson) {
+        mutableStateListOf<Pair<String, String>>().also { list ->
+            try {
+                val arr = org.json.JSONArray(aliasesJson)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    list.add(obj.getString("name") to obj.getString("prompt"))
+                }
+            } catch (_: Exception) {}
+        }
+    }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editIndex by remember { mutableIntStateOf(-1) }
+    var aliasesExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { aliasesExpanded = !aliasesExpanded }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Prompt Aliases",
+                style = MaterialTheme.typography.titleSmall,
+                color = teal,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Shortcuts for inline //commands",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+        }
+        Text(
+            if (aliasesExpanded) "▲" else "▼",
+            color = teal,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+
+    AnimatedVisibility(visible = aliasesExpanded) {
+        Column {
+            Text(
+                "Type //name to use. Chain multiple: //formal //translate",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+
+            aliases.forEachIndexed { index, (name, prompt) ->
+                BrandCard(
+                    modifier = Modifier.padding(vertical = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { editIndex = index },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "//$name",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                prompt,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2
+                            )
+                        }
+                        Text(
+                            "\u2715",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .clickable {
+                                    aliases.removeAt(index)
+                                    saveAliases(prefs, aliases)
+                                }
+                                .padding(8.dp)
+                        )
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = { showAddDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                Text("+ Add alias")
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        PromptAliasDialog(
+            onDismiss = { showAddDialog = false },
+            onSave = { name, prompt ->
+                aliases.add(name to prompt)
+                saveAliases(prefs, aliases)
+                showAddDialog = false
+            }
+        )
+    }
+
+    if (editIndex >= 0 && editIndex < aliases.size) {
+        val (editName, editPrompt) = aliases[editIndex]
+        PromptAliasDialog(
+            initialName = editName,
+            initialPrompt = editPrompt,
+            onDismiss = { editIndex = -1 },
+            onSave = { name, prompt ->
+                aliases[editIndex] = name to prompt
+                saveAliases(prefs, aliases)
+                editIndex = -1
+            }
+        )
+    }
+}
+
+private fun saveAliases(prefs: android.content.SharedPreferences, aliases: List<Pair<String, String>>) {
+    val arr = org.json.JSONArray()
+    for ((name, prompt) in aliases) {
+        val obj = org.json.JSONObject()
+        obj.put("name", name)
+        obj.put("prompt", prompt)
+        arr.put(obj)
+    }
+    prefs.edit().putString(Settings.PREF_AI_PROMPT_ALIASES, arr.toString()).apply()
+}
+
+@Composable
+private fun PromptAliasDialog(
+    initialName: String = "",
+    initialPrompt: String = "",
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var name by remember { mutableStateOf(initialName) }
+    var prompt by remember { mutableStateOf(initialPrompt) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialName.isEmpty()) "New Prompt Alias" else "Edit Prompt Alias") },
+        text = {
+            Column {
+                androidx.compose.material3.OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.replace(" ", "").replace("/", "") },
+                    label = { Text("Name (e.g. formal)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = prompt,
+                    onValueChange = { prompt = it },
+                    label = { Text("Prompt") },
+                    placeholder = { Text("Make this text more formal. Return only the rewritten text.") },
+                    minLines = 3,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (name.isNotBlank() && prompt.isNotBlank()) onSave(name.trim(), prompt.trim()) },
+                enabled = name.isNotBlank() && prompt.isNotBlank()
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 // =============================================================================

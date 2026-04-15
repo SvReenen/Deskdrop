@@ -819,6 +819,13 @@ public final class InputLogic {
                 }
                 mLatinIME.showAiActionsDialog();
                 break;
+            case KeyCode.AI_TONE:
+                if (isPasswordField()) {
+                    Toast.makeText(mLatinIME, "AI disabled in password fields", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                handleAiTone();
+                break;
             case KeyCode.ACTION_NEXT:
                 performEditorAction(EditorInfo.IME_ACTION_NEXT);
                 break;
@@ -2265,8 +2272,7 @@ public final class InputLogic {
         if (hadSelection) {
             mConnection.commitText(undoText, 1);
         } else {
-            mConnection.selectAll();
-            mConnection.commitText(undoText, 1);
+            mConnection.replaceAllText(undoText);
         }
     }
 
@@ -2348,12 +2354,22 @@ public final class InputLogic {
 
         final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
 
-        // Detect inline // instruction
+        // Detect inline // instruction (supports chaining: text //formal //translate)
         String inlineInstruction = null;
         String inlineContent = text;
-        int triggerIndex = text.lastIndexOf("//");
-        while (triggerIndex > 0 && text.charAt(triggerIndex - 1) == ':') {
-            triggerIndex = text.lastIndexOf("//", triggerIndex - 1);
+        // Find the FIRST non-URL // to capture the full chain
+        int triggerIndex = -1;
+        int searchFrom = 0;
+        while (searchFrom < text.length()) {
+            int idx = text.indexOf("//", searchFrom);
+            if (idx < 0) break;
+            if (idx > 0 && text.charAt(idx - 1) == ':') {
+                // Skip URL schemes (http://, https://, ftp://)
+                searchFrom = idx + 2;
+                continue;
+            }
+            triggerIndex = idx;
+            break;
         }
         if (triggerIndex >= 0) {
             String afterTrigger = text.substring(triggerIndex + 2);
@@ -2364,8 +2380,24 @@ public final class InputLogic {
                 inlineContent = text.substring(0, triggerIndex).trim();
             }
         }
+        // If inline instruction has no content, use clipboard as input
+        boolean clipboardUsed = false;
+        if (inlineInstruction != null && inlineContent.isEmpty()) {
+            android.content.ClipboardManager cb = (android.content.ClipboardManager) mLatinIME.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            if (cb != null && cb.hasPrimaryClip()) {
+                android.content.ClipData clip = cb.getPrimaryClip();
+                if (clip != null && clip.getItemCount() > 0) {
+                    CharSequence clipText = clip.getItemAt(0).getText();
+                    if (clipText != null && clipText.length() > 0) {
+                        inlineContent = clipText.toString();
+                        clipboardUsed = true;
+                    }
+                }
+            }
+        }
         final String fInlineInstruction = inlineInstruction;
         final String fInlineContent = inlineContent;
+        final boolean fClipboardUsed = clipboardUsed;
 
         // Clear gold mode
         if (mInlineInstructionMode) {
@@ -2400,13 +2432,129 @@ public final class InputLogic {
                         if (cb != null) cb.setPrimaryClip(android.content.ClipData.newPlainText("AI result", result));
                         return;
                     }
-                    saveAiUndo(text, hasSelection, 0);
-                    if (hasSelection) {
-                        mConnection.commitText(result, 1);
-                    } else {
-                        mConnection.selectAll();
-                        mConnection.commitText(result, 1);
-                    }
+
+                    // Show preview panel instead of direct commit
+                    mLatinIME.showAiPreview(result);
+                    mLatinIME.setupAiPreviewButtons(
+                        // Apply - uses current preview text (may have been tone-adjusted)
+                        () -> {
+                            android.view.View panel = helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getAiPreviewPanel();
+                            String currentText = result;
+                            if (panel != null) {
+                                android.widget.TextView tv = panel.findViewById(helium314.keyboard.latin.R.id.ai_preview_text);
+                                if (tv != null) currentText = tv.getText().toString();
+                            }
+                            final String applyText = currentText;
+                            if (fClipboardUsed) {
+                                mConnection.replaceAllText(applyText);
+                            } else {
+                                saveAiUndo(text, hasSelection, 0);
+                                if (hasSelection) {
+                                    mConnection.commitText(applyText, 1);
+                                } else {
+                                    mConnection.replaceAllText(applyText);
+                                }
+                            }
+                            mLatinIME.hideAiPreview();
+                        },
+                        // Retry - re-run AI in-place, keep panel open
+                        () -> {
+                            mLatinIME.startAiShimmer();
+                            final helium314.keyboard.latin.ai.AiCancelRegistry.CancelHandle retryHandle =
+                                helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.start(
+                                    helium314.keyboard.latin.utils.ToolbarKey.AI_ASSIST);
+                            new Thread(() -> {
+                                try {
+                                    final String retryResult;
+                                    if (fInlineInstruction != null) {
+                                        retryResult = helium314.keyboard.latin.ai.AiServiceSync.processInline(fInlineContent, fInlineInstruction, prefs, retryHandle);
+                                    } else {
+                                        retryResult = helium314.keyboard.latin.ai.AiServiceSync.process(text, prefs, retryHandle);
+                                    }
+                                    mLatinIME.mHandler.post(() -> {
+                                        mLatinIME.stopAiShimmer();
+                                        boolean retryCancelled = helium314.keyboard.latin.ai.AiCancelRegistry.isCancelled(retryHandle);
+                                        helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(retryHandle);
+                                        if (retryCancelled) return;
+                                        // Typewrite new result into existing panel
+                                        mLatinIME.showAiPreviewInstant(retryResult);
+                                        // Re-setup buttons with new result
+                                        mLatinIME.setupAiPreviewButtons(
+                                            // Apply
+                                            () -> {
+                                                android.view.View p = helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getAiPreviewPanel();
+                                                String ct = retryResult;
+                                                if (p != null) {
+                                                    android.widget.TextView tv2 = p.findViewById(helium314.keyboard.latin.R.id.ai_preview_text);
+                                                    if (tv2 != null) ct = tv2.getText().toString();
+                                                }
+                                                final String at = ct;
+                                                if (fClipboardUsed) {
+                                                    mConnection.replaceAllText(at);
+                                                } else {
+                                                    saveAiUndo(text, hasSelection, 0);
+                                                    if (hasSelection) {
+                                                        mConnection.commitText(at, 1);
+                                                    } else {
+                                                        mConnection.replaceAllText(at);
+                                                    }
+                                                }
+                                                mLatinIME.hideAiPreview();
+                                            },
+                                            // Retry (recursive - re-run same AI call)
+                                            () -> {
+                                                mLatinIME.startAiShimmer();
+                                                final helium314.keyboard.latin.ai.AiCancelRegistry.CancelHandle rh2 =
+                                                    helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.start(
+                                                        helium314.keyboard.latin.utils.ToolbarKey.AI_ASSIST);
+                                                new Thread(() -> {
+                                                    try {
+                                                        final String rr2;
+                                                        if (fInlineInstruction != null) {
+                                                            rr2 = helium314.keyboard.latin.ai.AiServiceSync.processInline(fInlineContent, fInlineInstruction, prefs, rh2);
+                                                        } else {
+                                                            rr2 = helium314.keyboard.latin.ai.AiServiceSync.process(text, prefs, rh2);
+                                                        }
+                                                        mLatinIME.mHandler.post(() -> {
+                                                            mLatinIME.stopAiShimmer();
+                                                            if (helium314.keyboard.latin.ai.AiCancelRegistry.isCancelled(rh2)) return;
+                                                            helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(rh2);
+                                                            mLatinIME.showAiPreviewInstant(rr2);
+                                                        });
+                                                    } catch (Exception ex2) {
+                                                        mLatinIME.mHandler.post(() -> {
+                                                            mLatinIME.stopAiShimmer();
+                                                            android.widget.Toast.makeText(mLatinIME, "AI error: " + ex2.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                                                        });
+                                                    }
+                                                }).start();
+                                            },
+                                            // Dismiss
+                                            () -> { mLatinIME.hideAiPreview(); },
+                                            // Edit
+                                            () -> { mLatinIME.hideAiPreview(); },
+                                            retryResult
+                                        );
+                                    });
+                                } catch (Exception ex) {
+                                    mLatinIME.mHandler.post(() -> {
+                                        mLatinIME.stopAiShimmer();
+                                        android.widget.Toast.makeText(mLatinIME, "AI error: " + ex.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                                    });
+                                }
+                            }).start();
+                        },
+                        // Dismiss
+                        () -> {
+                            mLatinIME.hideAiPreview();
+                        },
+                        // Edit - go back to keyboard to edit prompt
+                        () -> {
+                            mLatinIME.hideAiPreview();
+                        },
+                        // Result text for copy
+                        result
+                    );
                 });
             } catch (Exception e) {
                 mLatinIME.mHandler.post(() -> {
@@ -2419,6 +2567,97 @@ public final class InputLogic {
                 });
             }
         }).start();
+    }
+
+    private void handleAiTone() {
+        // Get text from selection or full field
+        final CharSequence selected = mConnection.getSelectedText(0);
+        String fieldText;
+        final boolean hasSelection;
+        if (selected != null && selected.length() > 0) {
+            fieldText = selected.toString();
+            hasSelection = true;
+        } else {
+            final CharSequence before = mConnection.getTextBeforeCursor(5000, 0);
+            final CharSequence after = mConnection.getTextAfterCursor(5000, 0);
+            fieldText = (before != null ? before.toString() : "") + (after != null ? after.toString() : "");
+            hasSelection = false;
+        }
+        final String text = fieldText;
+        if (text.isEmpty()) {
+            android.widget.Toast.makeText(mLatinIME, "No text to adjust", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Check clipboard for context
+        String clipContext = null;
+        try {
+            android.content.ClipboardManager cb = (android.content.ClipboardManager) mLatinIME.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            if (cb != null && cb.hasPrimaryClip()) {
+                android.content.ClipData clip = cb.getPrimaryClip();
+                if (clip != null && clip.getItemCount() > 0) {
+                    CharSequence clipText = clip.getItemAt(0).getText();
+                    if (clipText != null && clipText.length() > 0 && !clipText.toString().equals(text)
+                            && !clipText.toString().equals(mLatinIME.getDismissedClipboardText())) {
+                        clipContext = clipText.toString();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        final String fClipContext = clipContext;
+
+        // Show preview panel with original text, let user pick a tone chip
+        mLatinIME.showAiPreview(text, fClipContext);
+        mLatinIME.setupAiPreviewButtons(
+            // Apply
+            () -> {
+                android.view.View panel = helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getAiPreviewPanel();
+                String currentText = text;
+                if (panel != null) {
+                    android.widget.TextView tv = panel.findViewById(helium314.keyboard.latin.R.id.ai_preview_text);
+                    if (tv != null) currentText = tv.getText().toString();
+                }
+                final String applyText = currentText;
+                saveAiUndo(text, hasSelection, 0);
+                if (hasSelection) {
+                    mConnection.commitText(applyText, 1);
+                } else {
+                    mConnection.replaceAllText(applyText);
+                }
+                mLatinIME.hideAiPreview();
+            },
+            // Retry - re-run last tone chip
+            () -> {
+                String lastPrompt = mLatinIME.getLastTonePrompt();
+                String lastInput = mLatinIME.getLastToneInput();
+                if (lastPrompt == null || lastInput == null) return;
+                mLatinIME.startAiShimmer();
+                android.content.SharedPreferences retryPrefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
+                new Thread(() -> {
+                    try {
+                        String retryResult = helium314.keyboard.latin.ai.AiServiceSync.processInline(
+                            lastInput, lastPrompt, retryPrefs, null);
+                        mLatinIME.mHandler.post(() -> {
+                            mLatinIME.stopAiShimmer();
+                            mLatinIME.showAiPreviewInstant(retryResult);
+                        });
+                    } catch (Exception ex) {
+                        mLatinIME.mHandler.post(() -> {
+                            mLatinIME.stopAiShimmer();
+                            android.widget.Toast.makeText(mLatinIME, "AI error: " + ex.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                }).start();
+            },
+            // Dismiss
+            () -> { mLatinIME.hideAiPreview(); },
+            // Edit
+            () -> { mLatinIME.hideAiPreview(); },
+            // Result text for copy
+            text,
+            // Clipboard context
+            fClipContext
+        );
     }
 
     private void handleAiSlot(int slotNumber) {
@@ -2515,8 +2754,7 @@ public final class InputLogic {
                     if (hasSelection) {
                         mConnection.commitText(result, 1);
                     } else {
-                        mConnection.selectAll();
-                        mConnection.commitText(result, 1);
+                        mConnection.replaceAllText(result);
                     }
                 });
             } catch (Exception e) {
