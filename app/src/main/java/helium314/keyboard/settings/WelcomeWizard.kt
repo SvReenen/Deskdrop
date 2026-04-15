@@ -679,7 +679,7 @@ fun WelcomeWizard(
                                             val mc = android.widget.MediaController(ctx2)
                                             mc.setAnchorView(this)
                                             setMediaController(mc)
-                                            val uri = android.net.Uri.parse("https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/onboarding-groq-guide-cropped.mp4")
+                                            val uri = android.net.Uri.parse("android.resource://${ctx.packageName}/${helium314.keyboard.latin.R.raw.onboarding_groq_guide_video}")
                                             setVideoURI(uri)
                                             setOnPreparedListener { mp ->
                                                 mp.isLooping = true
@@ -1035,7 +1035,7 @@ fun WelcomeWizard(
                                             val mc = android.widget.MediaController(ctx2)
                                             mc.setAnchorView(this)
                                             setMediaController(mc)
-                                            val uri = android.net.Uri.parse("https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/onboarding-groq-guide-cropped.mp4")
+                                            val uri = android.net.Uri.parse("android.resource://${ctx.packageName}/${helium314.keyboard.latin.R.raw.onboarding_groq_guide_video}")
                                             setVideoURI(uri)
                                             setOnPreparedListener { mp ->
                                                 mp.isLooping = true
