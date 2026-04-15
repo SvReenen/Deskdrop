@@ -93,8 +93,8 @@ import kotlinx.coroutines.withContext
 private val DeskdropTeal = Color(0xFF2D8B7A)
 
 private val wizardCloudModels = listOf(
-    "Gemini 2.5 Flash" to "gemini:gemini-2.5-flash",
     "Llama 4 Scout (Groq)" to "groq:meta-llama/llama-4-scout-17b-16e-instruct",
+    "Gemini 2.5 Flash" to "gemini:gemini-2.5-flash",
     "Llama 3.3 70B (Groq)" to "groq:llama-3.3-70b-versatile",
     "Gemma 2 9B (Groq)" to "groq:gemma2-9b-it",
     "Gemma 3 27B (OpenRouter)" to "openrouter:google/gemma-3-27b-it:free",
@@ -643,6 +643,7 @@ fun WelcomeWizard(
                     6 -> {
                         var showGroqKeyDialog by rememberSaveable { mutableStateOf(false) }
                         var showGeminiKeyDialog by rememberSaveable { mutableStateOf(false) }
+                        var showGroqGuideVideo by rememberSaveable { mutableStateOf(false) }
 
                         Text("Cloud AI Setup", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
                         Spacer(Modifier.height(8.dp))
@@ -656,10 +657,41 @@ fun WelcomeWizard(
                         Spacer(Modifier.height(8.dp))
                         SettingRow("Paste your API key", if (groqApiKey.isBlank()) "(not set)" else "\u2022".repeat(minOf(groqApiKey.length, 20))) { showGroqKeyDialog = true }
                         Spacer(Modifier.height(6.dp))
-                        OutlinedButton(
-                            onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/"))) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Get Groq API key", color = DeskdropTeal) }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/keys"))) },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Get API key", color = DeskdropTeal) }
+                            OutlinedButton(
+                                onClick = { showGroqGuideVideo = !showGroqGuideVideo },
+                                modifier = Modifier.weight(1f)
+                            ) { Text(if (showGroqGuideVideo) "\u25A0 Hide" else "\u25B6 Guide", color = DeskdropTeal) }
+                        }
+                        if (showGroqGuideVideo) {
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AndroidView(
+                                    factory = { ctx2 ->
+                                        android.widget.VideoView(ctx2).apply {
+                                            val mc = android.widget.MediaController(ctx2)
+                                            mc.setAnchorView(this)
+                                            setMediaController(mc)
+                                            val uri = android.net.Uri.parse("https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/onboarding-groq-guide-cropped.mp4")
+                                            setVideoURI(uri)
+                                            setOnPreparedListener { mp ->
+                                                mp.isLooping = true
+                                                mp.setVolume(0f, 0f)
+                                                start()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(0.85f).aspectRatio(886f / 1520f).clip(RoundedCornerShape(12.dp))
+                                )
+                            }
+                        }
 
                         Spacer(Modifier.height(24.dp))
 
@@ -971,6 +1003,7 @@ fun WelcomeWizard(
                     // Step 11: Quick Start — Groq API key
                     11 -> {
                         var showQuickGroqKeyDialog by rememberSaveable { mutableStateOf(false) }
+                        var showQuickGuideVideo by rememberSaveable { mutableStateOf(false) }
 
                         Text("Add AI to your keyboard", style = MaterialTheme.typography.titleLarge, color = DeskdropTeal)
                         Spacer(Modifier.height(4.dp))
@@ -980,10 +1013,41 @@ fun WelcomeWizard(
 
                         SettingRow("Paste your API key", if (groqApiKey.isBlank()) "(not set)" else "\u2022".repeat(minOf(groqApiKey.length, 20))) { showQuickGroqKeyDialog = true }
                         Spacer(Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/"))) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Get free Groq API key", color = DeskdropTeal) }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/keys"))) },
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Get API key", color = DeskdropTeal) }
+                            OutlinedButton(
+                                onClick = { showQuickGuideVideo = !showQuickGuideVideo },
+                                modifier = Modifier.weight(1f)
+                            ) { Text(if (showQuickGuideVideo) "\u25A0 Hide" else "\u25B6 Guide", color = DeskdropTeal) }
+                        }
+                        if (showQuickGuideVideo) {
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AndroidView(
+                                    factory = { ctx2 ->
+                                        android.widget.VideoView(ctx2).apply {
+                                            val mc = android.widget.MediaController(ctx2)
+                                            mc.setAnchorView(this)
+                                            setMediaController(mc)
+                                            val uri = android.net.Uri.parse("https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/onboarding-groq-guide-cropped.mp4")
+                                            setVideoURI(uri)
+                                            setOnPreparedListener { mp ->
+                                                mp.isLooping = true
+                                                mp.setVolume(0f, 0f)
+                                                start()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(0.85f).aspectRatio(886f / 1520f).clip(RoundedCornerShape(12.dp))
+                                )
+                            }
+                        }
 
                         Spacer(Modifier.height(24.dp))
                         Button(

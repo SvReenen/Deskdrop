@@ -125,6 +125,8 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
 3. Paste your key and continue
 4. The AI demo lets you test your connection before finishing
 
+[Watch the Groq setup guide (1 min)](https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/groq-guide.mp4)
+
 **Local path (Ollama)**
 
 1. Make sure Ollama is running on your computer

@@ -2321,6 +2321,65 @@ public final class InputLogic {
         return null;
     }
 
+    private void showAiSetupMessage() {
+        String setupMsg = "\u2699\uFE0F No AI configured yet\n1. Get a free API key at console.groq.com/keys\n2. Paste it in Settings > AI > Essentials > Groq API Key\n\nTap Apply to watch the setup guide.";
+        mLatinIME.showAiPreview(setupMsg);
+        android.view.View panel = helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().getAiPreviewPanel();
+        if (panel != null) {
+            android.widget.TextView tv = panel.findViewById(helium314.keyboard.latin.R.id.ai_preview_text);
+            if (tv != null) tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        }
+        mLatinIME.setupAiPreviewButtons(
+            () -> {
+                android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                intent.setDataAndType(android.net.Uri.parse("https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/groq-guide.mp4"), "video/mp4");
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                mLatinIME.startActivity(intent);
+                mLatinIME.hideAiPreview();
+            },
+            () -> { mLatinIME.hideAiPreview(); },
+            () -> { mLatinIME.hideAiPreview(); },
+            null,
+            setupMsg
+        );
+    }
+
+    /** Returns true if at least one cloud API key is set or a local backend URL is configured. */
+    private boolean isAnyAiConfigured() {
+        if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_GROQ_API_KEY).isEmpty()) return true;
+        if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_GEMINI_API_KEY).isEmpty()) return true;
+        if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_OPENROUTER_API_KEY).isEmpty()) return true;
+        if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_ANTHROPIC_API_KEY).isEmpty()) return true;
+        if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_OPENAI_API_KEY).isEmpty()) return true;
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
+        String ollamaUrl = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_OLLAMA_URL, "");
+        if (ollamaUrl != null && !ollamaUrl.isEmpty()) return true;
+        return false;
+    }
+
+    private boolean isAiModelReady(String model) {
+        if (model == null || model.isEmpty()) return false;
+        String backend = model.contains(":") ? model.substring(0, model.indexOf(":")) : model;
+        switch (backend) {
+            case "gemini":
+                return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_GEMINI_API_KEY).isEmpty();
+            case "groq":
+                return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_GROQ_API_KEY).isEmpty();
+            case "openrouter":
+                return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_OPENROUTER_API_KEY).isEmpty();
+            case "anthropic":
+                return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_ANTHROPIC_API_KEY).isEmpty();
+            case "openai":
+                return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_OPENAI_API_KEY).isEmpty();
+            case "ollama":
+            case "onnx":
+            case "openai_compat":
+                return true; // local backends don't need API keys
+            default:
+                return true;
+        }
+    }
+
     private void handleAiAssist() {
         // If undo is available, perform undo instead
         if (hasAiUndo()) {
@@ -2353,6 +2412,13 @@ public final class InputLogic {
         if (text.isEmpty()) return;
 
         final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
+
+        // Check if AI is configured - if not, show setup message
+        final String aiModel = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        if (aiModel == null || aiModel.isEmpty() || !isAiModelReady(aiModel)) {
+            showAiSetupMessage();
+            return;
+        }
 
         // Detect inline // instruction (supports chaining: text //formal //translate)
         String inlineInstruction = null;
@@ -2570,6 +2636,14 @@ public final class InputLogic {
     }
 
     private void handleAiTone() {
+        // Check if AI is configured
+        final android.content.SharedPreferences tonePrefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
+        final String toneModel = tonePrefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        if (toneModel == null || toneModel.isEmpty() || !isAiModelReady(toneModel)) {
+            showAiSetupMessage();
+            return;
+        }
+
         // Get text from selection or full field
         final CharSequence selected = mConnection.getSelectedText(0);
         String fieldText;

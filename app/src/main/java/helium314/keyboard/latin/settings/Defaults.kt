@@ -180,8 +180,8 @@ object Defaults {
     const val PREF_SAVE_SUBTYPE_PER_APP = false
 
     // AI settings
-    const val PREF_AI_BACKEND = "gemini"
-    const val PREF_AI_MODEL = "gemini:gemini-2.5-flash"
+    const val PREF_AI_BACKEND = "groq"
+    const val PREF_AI_MODEL = "groq:meta-llama/llama-4-scout-17b-16e-instruct"
     const val PREF_AI_MODEL_FILTER = "both"
     const val PREF_GEMINI_API_KEY = ""
     const val PREF_GROQ_API_KEY = ""

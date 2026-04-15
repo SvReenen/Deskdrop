@@ -804,6 +804,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mAiPreviewPanel.setBackground(mKeyboardView.getBackground());
 
         mAiPreviewText.setText("");
+        mAiPreviewText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
         mKeyboardView.setVisibility(View.GONE);
         mEmojiPalettesView.setVisibility(View.GONE);
         mClipboardHistoryView.setVisibility(View.GONE);
@@ -873,6 +874,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                     target.postDelayed(this, 16);
                 } else {
                     mTypewriterRunnable = null;
+                    android.text.util.Linkify.addLinks(target, android.text.util.Linkify.WEB_URLS);
+                    target.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
                 }
             }
         };

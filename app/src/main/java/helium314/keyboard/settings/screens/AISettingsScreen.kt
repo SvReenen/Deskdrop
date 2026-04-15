@@ -1949,7 +1949,7 @@ private fun ModelPresetsSection(
     ) {
         OutlinedButton(
             onClick = {
-                val defaultModel = availableModels.firstOrNull()?.second ?: "gemini:gemini-2.5-flash"
+                val defaultModel = availableModels.firstOrNull()?.second ?: Defaults.PREF_AI_MODEL
                 val updated = presets.toMutableList()
                 updated.add(CloudPreset(
                     id = java.util.UUID.randomUUID().toString(),

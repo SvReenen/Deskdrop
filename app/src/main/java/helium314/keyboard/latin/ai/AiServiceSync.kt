@@ -771,7 +771,7 @@ object AiServiceSync {
                 val model = prefs.getString(Settings.PREF_OLLAMA_MODEL, Defaults.PREF_OLLAMA_MODEL) ?: Defaults.PREF_OLLAMA_MODEL
                 callOllama(prompt, model, prefs, cancelHandle)
             }
-            else -> callGemini(prompt, "gemini-2.5-flash", prefs, cancelHandle)
+            else -> callOpenAICompatible(prompt, Defaults.PREF_AI_MODEL.substringAfter(":"), "https://api.groq.com/openai/v1/chat/completions", SecureApiKeys.getKey(Settings.PREF_GROQ_API_KEY), "Groq", cancelHandle)
         }
     }
 
