@@ -2331,10 +2331,26 @@ public final class InputLogic {
         }
         mLatinIME.setupAiPreviewButtons(
             () -> {
-                android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
-                intent.setDataAndType(android.net.Uri.parse("https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/groq-guide.mp4"), "video/mp4");
-                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                mLatinIME.startActivity(intent);
+                try {
+                    java.io.File videoDir = new java.io.File(mLatinIME.getCacheDir(), "video_temp");
+                    if (!videoDir.exists()) videoDir.mkdirs();
+                    java.io.File videoFile = new java.io.File(videoDir, "groq-guide.mp4");
+                    if (!videoFile.exists()) {
+                        java.io.InputStream is = mLatinIME.getResources().openRawResource(helium314.keyboard.latin.R.raw.groq_guide_video);
+                        java.io.FileOutputStream fos = new java.io.FileOutputStream(videoFile);
+                        byte[] buf = new byte[8192];
+                        int len;
+                        while ((len = is.read(buf)) != -1) fos.write(buf, 0, len);
+                        fos.close();
+                        is.close();
+                    }
+                    android.net.Uri contentUri = androidx.core.content.FileProvider.getUriForFile(
+                        mLatinIME, mLatinIME.getString(helium314.keyboard.latin.R.string.gesture_data_provider_authority), videoFile);
+                    android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                    intent.setDataAndType(contentUri, "video/mp4");
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    mLatinIME.startActivity(intent);
+                } catch (Exception e) { /* ignore */ }
                 mLatinIME.hideAiPreview();
             },
             () -> { mLatinIME.hideAiPreview(); },

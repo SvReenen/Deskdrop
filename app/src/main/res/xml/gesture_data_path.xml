@@ -9,4 +9,7 @@
     <cache-path
         name="camera_temp"
         path="camera_temp"/>
+    <cache-path
+        name="video_temp"
+        path="video_temp"/>
 </paths>
