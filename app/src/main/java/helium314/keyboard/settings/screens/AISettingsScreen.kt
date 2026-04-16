@@ -230,15 +230,21 @@ private fun EditablePrefField(
     }
 }
 
+private enum class ApiAuthStyle { BEARER, QUERY_PARAM, X_API_KEY }
+
 @Composable
 private fun EditableSecretField(
     secretKey: String,
     label: String,
     placeholder: String = "Tap to enter your API key…",
-    dialogDescription: String? = null
+    dialogDescription: String? = null,
+    testUrl: String? = null,
+    testAuthStyle: ApiAuthStyle = ApiAuthStyle.BEARER
 ) {
     var showDialog by remember { mutableStateOf(false) }
     var current by remember { mutableStateOf(helium314.keyboard.latin.ai.SecureApiKeys.getKey(secretKey)) }
+    var testStatus by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     EditableFieldRow(
         label = label,
         value = current,
@@ -246,6 +252,58 @@ private fun EditableSecretField(
         isSecret = true,
         onClick = { showDialog = true }
     )
+    if (current.isNotBlank() && testUrl != null) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Test connection",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable {
+                    testStatus = "Testing..."
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            val fullUrl = if (testAuthStyle == ApiAuthStyle.QUERY_PARAM) testUrl + current.trim() else testUrl
+                            val url = java.net.URL(fullUrl)
+                            val conn = url.openConnection() as java.net.HttpURLConnection
+                            conn.requestMethod = "GET"
+                            when (testAuthStyle) {
+                                ApiAuthStyle.BEARER -> conn.setRequestProperty("Authorization", "Bearer ${current.trim()}")
+                                ApiAuthStyle.X_API_KEY -> {
+                                    conn.setRequestProperty("x-api-key", current.trim())
+                                    conn.setRequestProperty("anthropic-version", "2023-06-01")
+                                }
+                                else -> {}
+                            }
+                            conn.connectTimeout = 5000
+                            conn.readTimeout = 5000
+                            val code = conn.responseCode
+                            conn.disconnect()
+                            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                testStatus = if (code in 200..299) "\u2705 Connected" else "\u274C Error ($code)"
+                            }
+                        } catch (e: Exception) {
+                            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                testStatus = "\u274C ${e.message?.take(40) ?: "Failed"}"
+                            }
+                        }
+                    }
+                }
+            )
+            if (testStatus != null) {
+                Text(
+                    testStatus!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (testStatus!!.startsWith("\u2705")) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
     if (showDialog) {
         helium314.keyboard.settings.dialogs.TextInputDialog(
             onDismissRequest = { showDialog = false },
@@ -253,6 +311,7 @@ private fun EditableSecretField(
                 val trimmed = it.trim()
                 helium314.keyboard.latin.ai.SecureApiKeys.setKey(secretKey, trimmed)
                 current = trimmed
+                testStatus = null
                 helium314.keyboard.keyboard.KeyboardSwitcher.getInstance().setThemeNeedsReload()
             },
             initialText = current,
@@ -1664,7 +1723,8 @@ private fun CloudTab(
         EditableSecretField(
             secretKey = Settings.PREF_GROQ_API_KEY,
             label = stringResource(R.string.groq_api_key),
-            placeholder = "Paste your API key"
+            placeholder = "Paste your API key",
+            testUrl = "https://api.groq.com/openai/v1/models"
         )
         Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
             Text(
@@ -1688,7 +1748,9 @@ private fun CloudTab(
         EditableSecretField(
             secretKey = Settings.PREF_GEMINI_API_KEY,
             label = stringResource(R.string.gemini_api_key),
-            placeholder = "Paste your API key"
+            placeholder = "Paste your API key",
+            testUrl = "https://generativelanguage.googleapis.com/v1beta/models?key=",
+            testAuthStyle = ApiAuthStyle.QUERY_PARAM
         )
         Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
             Spacer(Modifier.weight(1f))
@@ -1734,21 +1796,25 @@ private fun CloudTab(
                 EditableSecretField(
                     secretKey = Settings.PREF_OPENROUTER_API_KEY,
                     label = stringResource(R.string.openrouter_api_key),
-                    placeholder = "Paste your API key"
+                    placeholder = "Paste your API key",
+                    testUrl = "https://openrouter.ai/api/v1/models"
                 )
 
                 // Anthropic API key
                 EditableSecretField(
                     secretKey = Settings.PREF_ANTHROPIC_API_KEY,
                     label = stringResource(R.string.anthropic_api_key),
-                    placeholder = "Paste your API key"
+                    placeholder = "Paste your API key",
+                    testUrl = "https://api.anthropic.com/v1/models",
+                    testAuthStyle = ApiAuthStyle.X_API_KEY
                 )
 
                 // OpenAI API key
                 EditableSecretField(
                     secretKey = Settings.PREF_OPENAI_API_KEY,
                     label = stringResource(R.string.openai_api_key),
-                    placeholder = "Paste your API key"
+                    placeholder = "Paste your API key",
+                    testUrl = "https://api.openai.com/v1/models"
                 )
 
                 // Search providers

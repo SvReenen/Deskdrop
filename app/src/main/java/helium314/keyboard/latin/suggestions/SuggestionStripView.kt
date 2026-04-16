@@ -603,6 +603,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private var aiPulseAnimator: ObjectAnimator? = null
+    private var aiSetupHintAnimators: MutableList<ObjectAnimator> = mutableListOf()
     private var aiUndoKey: ToolbarKey? = null
     private var aiOriginalDrawable: android.graphics.drawable.Drawable? = null
     private var aiVoiceOriginalDrawable: android.graphics.drawable.Drawable? = null
@@ -683,6 +684,33 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             aiPulseAnimator?.cancel()
             aiPulseAnimator = null
             button.alpha = 1f
+        }
+    }
+
+    fun setAiSetupHint(show: Boolean) {
+        aiSetupHintAnimators.forEach { it.cancel() }
+        aiSetupHintAnimators.clear()
+
+        if (!show) {
+            for (key in listOf(ToolbarKey.AI_ASSIST, ToolbarKey.AI_TONE)) {
+                val button = pinnedKeys.findViewWithTag<View>(key)
+                    ?: toolbar.findViewWithTag<View>(key)
+                button?.alpha = 1f
+            }
+            return
+        }
+
+        for (key in listOf(ToolbarKey.AI_ASSIST, ToolbarKey.AI_TONE)) {
+            val button = pinnedKeys.findViewWithTag<View>(key)
+                ?: toolbar.findViewWithTag<View>(key)
+                ?: continue
+            val animator = ObjectAnimator.ofFloat(button, "alpha", 1f, 0.3f).apply {
+                duration = 1200
+                repeatMode = ValueAnimator.REVERSE
+                repeatCount = ValueAnimator.INFINITE
+                start()
+            }
+            aiSetupHintAnimators.add(animator)
         }
     }
 

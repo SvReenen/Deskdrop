@@ -779,7 +779,7 @@ public final class InputLogic {
             case KeyCode.AI_CLIPBOARD: {
                 // Block AI in password fields
                 if (isPasswordField()) {
-                    Toast.makeText(mLatinIME, "AI disabled in password fields", Toast.LENGTH_SHORT).show();
+                    showAiBriefMessage("AI disabled in password fields", 1500);
                     break;
                 }
                 // Hard cancel: second tap on same active AI button aborts in-flight call
@@ -804,7 +804,7 @@ public final class InputLogic {
             }
             case KeyCode.AI_VOICE:
                 if (isPasswordField()) {
-                    Toast.makeText(mLatinIME, "AI disabled in password fields", Toast.LENGTH_SHORT).show();
+                    showAiBriefMessage("AI disabled in password fields", 1500);
                     break;
                 }
                 mLatinIME.startAiVoiceRecognition();
@@ -814,14 +814,14 @@ public final class InputLogic {
                 break;
             case KeyCode.AI_ACTIONS:
                 if (isPasswordField()) {
-                    Toast.makeText(mLatinIME, "AI disabled in password fields", Toast.LENGTH_SHORT).show();
+                    showAiBriefMessage("AI disabled in password fields", 1500);
                     break;
                 }
                 mLatinIME.showAiActionsDialog();
                 break;
             case KeyCode.AI_TONE:
                 if (isPasswordField()) {
-                    Toast.makeText(mLatinIME, "AI disabled in password fields", Toast.LENGTH_SHORT).show();
+                    showAiBriefMessage("AI disabled in password fields", 1500);
                     break;
                 }
                 handleAiTone();
@@ -2321,6 +2321,17 @@ public final class InputLogic {
         return null;
     }
 
+    private void showAiEmptyTextHint() {
+        showAiBriefMessage("Type something first, then tap AI", 1200);
+    }
+
+    /** Show a brief message in the AI preview panel and auto-hide. Replaces Toast for keyboard feedback. Thread-safe. */
+    private void showAiBriefMessage(String message, long durationMs) {
+        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+        handler.post(() -> mLatinIME.showAiPreview(message));
+        handler.postDelayed(() -> mLatinIME.hideAiPreview(), durationMs);
+    }
+
     private void showAiSetupMessage() {
         String setupMsg = "\u2699\uFE0F No AI configured yet\n1. Get a free API key at console.groq.com/keys\n2. Paste it in Settings > AI > Essentials > Groq API Key\n\nTap Apply to watch the setup guide.";
         mLatinIME.showAiPreview(setupMsg);
@@ -2361,7 +2372,7 @@ public final class InputLogic {
     }
 
     /** Returns true if at least one cloud API key is set or a local backend URL is configured. */
-    private boolean isAnyAiConfigured() {
+    public boolean isAnyAiConfigured() {
         if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_GROQ_API_KEY).isEmpty()) return true;
         if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_GEMINI_API_KEY).isEmpty()) return true;
         if (!helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_OPENROUTER_API_KEY).isEmpty()) return true;
@@ -2403,7 +2414,16 @@ public final class InputLogic {
             return;
         }
         if (mAiProcessing) {
-            android.widget.Toast.makeText(mLatinIME, "AI is still processing...", android.widget.Toast.LENGTH_SHORT).show();
+            showAiBriefMessage("AI is still processing...", 1500);
+            return;
+        }
+
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
+
+        // Check if AI is configured - if not, show setup message
+        final String aiModel = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        if (aiModel == null || aiModel.isEmpty() || !isAiModelReady(aiModel)) {
+            showAiSetupMessage();
             return;
         }
 
@@ -2425,14 +2445,8 @@ public final class InputLogic {
         }
 
         final String text = fieldText;
-        if (text.isEmpty()) return;
-
-        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
-
-        // Check if AI is configured - if not, show setup message
-        final String aiModel = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
-        if (aiModel == null || aiModel.isEmpty() || !isAiModelReady(aiModel)) {
-            showAiSetupMessage();
+        if (text.trim().isEmpty()) {
+            showAiEmptyTextHint();
             return;
         }
 
@@ -2509,7 +2523,7 @@ public final class InputLogic {
                     helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(handle);
                     if (cancelled) return;
                     if (!mConnection.isConnected()) {
-                        android.widget.Toast.makeText(mLatinIME, "Text field lost focus, result copied to clipboard", android.widget.Toast.LENGTH_LONG).show();
+                        showAiBriefMessage("Text field lost focus, result copied to clipboard", 2500);
                         android.content.ClipboardManager cb = (android.content.ClipboardManager) mLatinIME.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
                         if (cb != null) cb.setPrimaryClip(android.content.ClipData.newPlainText("AI result", result));
                         return;
@@ -2606,7 +2620,7 @@ public final class InputLogic {
                                                     } catch (Exception ex2) {
                                                         mLatinIME.mHandler.post(() -> {
                                                             mLatinIME.stopAiShimmer();
-                                                            android.widget.Toast.makeText(mLatinIME, "AI error: " + ex2.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                                                            showAiBriefMessage("AI error: " + ex2.getMessage(), 2500);
                                                         });
                                                     }
                                                 }).start();
@@ -2621,7 +2635,7 @@ public final class InputLogic {
                                 } catch (Exception ex) {
                                     mLatinIME.mHandler.post(() -> {
                                         mLatinIME.stopAiShimmer();
-                                        android.widget.Toast.makeText(mLatinIME, "AI error: " + ex.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                                        showAiBriefMessage("AI error: " + ex.getMessage(), 2500);
                                     });
                                 }
                             }).start();
@@ -2645,7 +2659,7 @@ public final class InputLogic {
                     boolean cancelled = helium314.keyboard.latin.ai.AiCancelRegistry.isCancelled(handle);
                     helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(handle);
                     if (cancelled) return;
-                    android.widget.Toast.makeText(mLatinIME, "AI error: " + e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                    showAiBriefMessage("AI error: " + e.getMessage(), 2500);
                 });
             }
         }).start();
@@ -2674,8 +2688,8 @@ public final class InputLogic {
             hasSelection = false;
         }
         final String text = fieldText;
-        if (text.isEmpty()) {
-            android.widget.Toast.makeText(mLatinIME, "No text to adjust", android.widget.Toast.LENGTH_SHORT).show();
+        if (text.trim().isEmpty()) {
+            showAiEmptyTextHint();
             return;
         }
 
@@ -2734,7 +2748,7 @@ public final class InputLogic {
                     } catch (Exception ex) {
                         mLatinIME.mHandler.post(() -> {
                             mLatinIME.stopAiShimmer();
-                            android.widget.Toast.makeText(mLatinIME, "AI error: " + ex.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                            showAiBriefMessage("AI error: " + ex.getMessage(), 2500);
                         });
                     }
                 }).start();
@@ -2762,18 +2776,8 @@ public final class InputLogic {
         // Read model before cloud fallback check (fallback happens on bg thread)
         final String modelSpecRaw = prefs.getString(modelPrefKey, "");
 
-        if (modelSpecRaw == null || modelSpecRaw.isEmpty()) {
-            android.widget.Toast.makeText(mLatinIME, helium314.keyboard.latin.R.string.ai_slot_unconfigured, android.widget.Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (mAiProcessing) {
-            android.widget.Toast.makeText(mLatinIME, "AI is still processing...", android.widget.Toast.LENGTH_SHORT).show();
-            return;
-        }
-
+        // Check for empty text first (before model check)
         mConnection.finishComposingText();
-
         final CharSequence selected = mConnection.getSelectedText(0);
         String fieldText;
         final boolean hasSelection;
@@ -2788,7 +2792,26 @@ public final class InputLogic {
         }
 
         final String text = fieldText;
-        if (text.isEmpty()) return;
+        if (text.trim().isEmpty()) {
+            showAiEmptyTextHint();
+            return;
+        }
+
+        if (modelSpecRaw == null || modelSpecRaw.isEmpty()) {
+            mLatinIME.showAiPreview("Configure this shortcut in Settings > AI");
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                mLatinIME.hideAiPreview();
+            }, 1500);
+            return;
+        }
+
+        if (mAiProcessing) {
+            mLatinIME.showAiPreview("AI is still processing...");
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                mLatinIME.hideAiPreview();
+            }, 1200);
+            return;
+        }
 
         mAiProcessing = true;
         mLatinIME.setAiProcessing(true, slotNumber);
@@ -2816,7 +2839,7 @@ public final class InputLogic {
                     mLatinIME.mHandler.post(() -> {
                         mAiProcessing = false;
                         mLatinIME.setAiProcessing(false, slotNumber);
-                        android.widget.Toast.makeText(mLatinIME, "Local server unreachable — no cloud fallback available", android.widget.Toast.LENGTH_SHORT).show();
+                        showAiBriefMessage("Local server unreachable — no cloud fallback available", 2000);
                     });
                     return;
                 }
@@ -2835,7 +2858,7 @@ public final class InputLogic {
                     helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(handle);
                     if (cancelled) return;
                     if (!mConnection.isConnected()) {
-                        android.widget.Toast.makeText(mLatinIME, "Text field lost focus, result copied to clipboard", android.widget.Toast.LENGTH_LONG).show();
+                        showAiBriefMessage("Text field lost focus, result copied to clipboard", 2500);
                         android.content.ClipboardManager cb = (android.content.ClipboardManager) mLatinIME.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
                         if (cb != null) cb.setPrimaryClip(android.content.ClipData.newPlainText("AI result", result));
                         return;
@@ -2854,7 +2877,7 @@ public final class InputLogic {
                     boolean cancelled = helium314.keyboard.latin.ai.AiCancelRegistry.isCancelled(handle);
                     helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(handle);
                     if (cancelled) return;
-                    android.widget.Toast.makeText(mLatinIME, "AI error: " + e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                    showAiBriefMessage("AI error: " + e.getMessage(), 2500);
                 });
             }
         }).start();
@@ -2863,7 +2886,7 @@ public final class InputLogic {
     public void handleAiVoiceResult(String rawTranscription) {
         if (rawTranscription == null || rawTranscription.trim().isEmpty()) return;
         if (mAiProcessing) {
-            android.widget.Toast.makeText(mLatinIME, "AI is still processing...", android.widget.Toast.LENGTH_SHORT).show();
+            showAiBriefMessage("AI is still processing...", 1500);
             return;
         }
 
@@ -2924,7 +2947,7 @@ public final class InputLogic {
                     helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(voiceHandle);
                     if (cancelled) return;
                     if (!mConnection.isConnected()) {
-                        android.widget.Toast.makeText(mLatinIME, "Text field lost focus, result copied to clipboard", android.widget.Toast.LENGTH_LONG).show();
+                        showAiBriefMessage("Text field lost focus, result copied to clipboard", 2500);
                         android.content.ClipboardManager cb = (android.content.ClipboardManager) mLatinIME.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
                         if (cb != null) cb.setPrimaryClip(android.content.ClipData.newPlainText("AI result", result));
                         return;
@@ -2940,7 +2963,7 @@ public final class InputLogic {
                     boolean cancelled = helium314.keyboard.latin.ai.AiCancelRegistry.isCancelled(voiceHandle);
                     helium314.keyboard.latin.ai.AiCancelRegistry.INSTANCE.clear(voiceHandle);
                     if (cancelled) return;
-                    android.widget.Toast.makeText(mLatinIME, "AI error: " + e.getMessage(), android.widget.Toast.LENGTH_SHORT).show();
+                    showAiBriefMessage("AI error: " + e.getMessage(), 2500);
                 });
             }
         }).start();

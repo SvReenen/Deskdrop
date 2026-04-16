@@ -803,6 +803,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         // Use keyboard background color
         mAiPreviewPanel.setBackground(mKeyboardView.getBackground());
 
+        // Apply theme-aware text colors to all text elements in the panel
+        applyAiPreviewThemeColors();
+
         mAiPreviewText.setText("");
         mAiPreviewText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
         mKeyboardView.setVisibility(View.GONE);
@@ -831,7 +834,42 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
     public void showAiPreviewInstant(String text) {
         if (mAiPreviewText == null) return;
+        applyAiPreviewThemeColors();
         typewriteText(text, mAiPreviewText);
+    }
+
+    /** Apply theme-aware text colors to all text elements in the AI preview panel. */
+    private void applyAiPreviewThemeColors() {
+        if (mAiPreviewPanel == null) return;
+        int textColor = helium314.keyboard.latin.settings.Settings.getValues().mColors.get(helium314.keyboard.latin.common.ColorType.KEY_TEXT);
+        if (mAiPreviewText != null) {
+            mAiPreviewText.setTextColor(textColor);
+        }
+        int[] ids = new int[]{
+            helium314.keyboard.latin.R.id.ai_preview_dismiss,
+            helium314.keyboard.latin.R.id.ai_preview_copy,
+            helium314.keyboard.latin.R.id.ai_preview_retry,
+            helium314.keyboard.latin.R.id.ai_preview_edit
+        };
+        for (int id : ids) {
+            android.widget.TextView tv = mAiPreviewPanel.findViewById(id);
+            if (tv != null) tv.setTextColor(textColor);
+        }
+        // Clipboard context label: use text color with 80% alpha (was teal, not visible in light mode)
+        android.widget.TextView contextLabel = mAiPreviewPanel.findViewById(helium314.keyboard.latin.R.id.ai_preview_context_label);
+        if (contextLabel != null) {
+            contextLabel.setTextColor((textColor & 0x00FFFFFF) | 0xCC000000);
+        }
+        // Scrollbar thumb color on the scroll view (API 29+)
+        android.widget.ScrollView scroll = mAiPreviewPanel.findViewById(helium314.keyboard.latin.R.id.ai_preview_scroll);
+        if (scroll != null && android.os.Build.VERSION.SDK_INT >= 29) {
+            android.graphics.drawable.GradientDrawable thumb = new android.graphics.drawable.GradientDrawable();
+            thumb.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            thumb.setColor((textColor & 0x00FFFFFF) | 0x80000000);
+            thumb.setCornerRadius(8f);
+            thumb.setSize((int)(3 * scroll.getResources().getDisplayMetrics().density), (int)(40 * scroll.getResources().getDisplayMetrics().density));
+            scroll.setVerticalScrollbarThumbDrawable(thumb);
+        }
     }
 
     public void hideAiPreview() {

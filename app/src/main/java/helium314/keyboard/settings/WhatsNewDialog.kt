@@ -47,7 +47,7 @@ data class WhatsNewFeature(
     val inlineIconRes: Int? = null
 )
 
-val WHATS_NEW_VERSION = "1.2.0"
+val WHATS_NEW_VERSION = "1.2.1"
 
 val WHATS_NEW_FEATURES = listOf(
     WhatsNewFeature(
@@ -77,6 +77,21 @@ val WHATS_NEW_FEATURES = listOf(
         "\u2699\uFE0F",
         "Fully Customizable",
         "Create your own //commands and tone chips in Settings > AI > General > Advanced."
+    ),
+    WhatsNewFeature(
+        "\uD83D\uDD27",
+        "v1.2.1 - Setup improvements",
+        "AI Assist and AI Tone buttons now pulse when no provider is configured, guiding you to setup. Added Test Connection button in AI settings to verify your API keys."
+    ),
+    WhatsNewFeature(
+        "\uD83D\uDCA1",
+        "v1.2.1 - Better feedback",
+        "Clearer in-keyboard messages when tapping AI buttons without text, in password fields, or when errors occur. Messages now show inside the keyboard, so they're always visible."
+    ),
+    WhatsNewFeature(
+        "\u2600\uFE0F",
+        "v1.2.1 - Light mode fixes",
+        "Fixed readability issues in light mode: AI preview text, tone chips, scrollbar, and clipboard label are now properly visible. Close button moved to top-right."
     ),
 )
 

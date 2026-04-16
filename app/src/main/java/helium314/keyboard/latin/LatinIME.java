@@ -998,6 +998,11 @@ public class LatinIME extends InputMethodService implements
             }).start();
         }
 
+        // Pulse AI toolbar keys if no AI provider is configured
+        if (hasSuggestionStripView()) {
+            mSuggestionStripView.setAiSetupHint(!mInputLogic.isAnyAiConfigured());
+        }
+
         // The EditorInfo might have a flag that affects fullscreen mode.
         // Note: This call should be done by InputMethodService?
         updateFullscreenMode();
@@ -1568,16 +1573,20 @@ public class LatinIME extends InputMethodService implements
         android.widget.LinearLayout chipsContainer = panel.findViewById(R.id.ai_preview_chips);
         chipsContainer.removeAllViews();
         final String[] currentResult = {resultText};
+        // Theme-aware chip colors
+        int chipTextColor = helium314.keyboard.latin.settings.Settings.getValues().mColors.get(helium314.keyboard.latin.common.ColorType.KEY_TEXT);
+        int chipStrokeColor = (chipTextColor & 0x00FFFFFF) | 0x40000000; // 25% alpha of text color
+        int chipFillColor = (chipTextColor & 0x00FFFFFF) | 0x1A000000;   // 10% alpha of text color
         for (String[] tone : loadToneChips()) {
             android.widget.TextView chip = new android.widget.TextView(this);
             chip.setText(tone[0]);
             chip.setTextSize(13);
-            chip.setTextColor(0xB3FFFFFF);
+            chip.setTextColor((chipTextColor & 0x00FFFFFF) | 0xB3000000);
             chip.setPadding(dp(12), dp(6), dp(12), dp(6));
             android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
             bg.setCornerRadius(dp(16));
-            bg.setStroke(dp(1), 0x40FFFFFF);
-            bg.setColor(0x1AFFFFFF);
+            bg.setStroke(dp(1), chipStrokeColor);
+            bg.setColor(chipFillColor);
             chip.setBackground(bg);
             android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
