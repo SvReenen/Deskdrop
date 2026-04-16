@@ -73,6 +73,7 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_GEMINI_API_KEY = "gemini_api_key";
     public static final String PREF_GROQ_API_KEY = "groq_api_key";
     public static final String PREF_OPENROUTER_API_KEY = "openrouter_api_key";
+    public static final String PREF_OPENROUTER_CUSTOM_MODELS = "openrouter_custom_models";
     public static final String PREF_ANTHROPIC_API_KEY = "anthropic_api_key";
     public static final String PREF_OPENAI_API_KEY = "openai_api_key";
     public static final String PREF_BRAVE_SEARCH_API_KEY = "brave_search_api_key";

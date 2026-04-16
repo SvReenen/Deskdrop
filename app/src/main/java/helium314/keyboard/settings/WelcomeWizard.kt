@@ -73,7 +73,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import helium314.keyboard.latin.R
 import helium314.keyboard.latin.ai.AiServiceSync
@@ -267,12 +266,12 @@ fun WelcomeWizard(
         finish()
     }
 
-    // Original wizard styling
+    // Original wizard styling — onboarding always uses dark styling regardless of system theme
     val useWideLayout = isWideScreen()
-    val stepBackgroundColor = Color(ContextCompat.getColor(ctx, R.color.setup_step_background))
-    val textColor = Color(ContextCompat.getColor(ctx, R.color.setup_text_action))
+    val stepBackgroundColor = Color(0xFF1A3A3A)
+    val textColor = Color(0xFFFFFFFF)
     val textColorDim = textColor.copy(alpha = 0.5f)
-    val titleColor = Color(ContextCompat.getColor(ctx, R.color.setup_text_title))
+    val titleColor = Color(0xFF4ECDB5)
     val appName = stringResource(ctx.applicationInfo.labelRes)
 
     @Composable fun bigText() {
@@ -291,7 +290,7 @@ fun WelcomeWizard(
                     "Rewrite, translate, and improve text instantly",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
-                    color = Color(0xFFEAEAEA),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     modifier = Modifier.fillMaxWidth()
                 )
             } else if (step <= 3) {
@@ -922,7 +921,7 @@ fun WelcomeWizard(
                         Text(
                             "Open any app and start typing.\nTap the AI button when you need it.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFEAEAEA),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -967,7 +966,7 @@ fun WelcomeWizard(
                         Text(
                             "Open any app and start typing.\nTap the AI button when you need it.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFEAEAEA),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -1076,34 +1075,39 @@ fun WelcomeWizard(
             }
     }
 
-    Surface {
-        CompositionLocalProvider(
-            LocalContentColor provides textColor,
-            LocalTextStyle provides MaterialTheme.typography.titleLarge.merge(color = textColor),
+    Theme(dark = true) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xFF121212)
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
-                contentAlignment = Alignment.Center
+            CompositionLocalProvider(
+                LocalContentColor provides textColor,
+                LocalTextStyle provides MaterialTheme.typography.titleLarge.merge(color = textColor),
             ) {
-                // Logo overlay top-left
-                Image(
-                    painter = BitmapPainter(
-                        BitmapFactory.decodeResource(ctx.resources, R.mipmap.ic_launcher_foreground)
-                            .asImageBitmap()
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp).align(Alignment.TopStart)
-                )
-                if (useWideLayout)
-                    Row {
-                        Box(Modifier.weight(0.4f)) { bigText() }
-                        Box(Modifier.weight(0.6f)) { steps() }
-                    }
-                else
-                    Column {
-                        bigText()
-                        steps()
-                    }
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Logo overlay top-left
+                    Image(
+                        painter = BitmapPainter(
+                            BitmapFactory.decodeResource(ctx.resources, R.mipmap.ic_launcher_foreground)
+                                .asImageBitmap()
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp).align(Alignment.TopStart)
+                    )
+                    if (useWideLayout)
+                        Row {
+                            Box(Modifier.weight(0.4f)) { bigText() }
+                            Box(Modifier.weight(0.6f)) { steps() }
+                        }
+                    else
+                        Column {
+                            bigText()
+                            steps()
+                        }
+                }
             }
         }
     }

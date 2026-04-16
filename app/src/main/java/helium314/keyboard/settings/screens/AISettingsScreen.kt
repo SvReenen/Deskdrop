@@ -80,7 +80,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val cloudModels get() = AiServiceSync.CLOUD_MODELS
+private fun cloudModelsFor(prefs: android.content.SharedPreferences) =
+    AiServiceSync.cloudModelsWithCustom(prefs)
 
 @Composable
 fun AISettingsScreen(onClickBack: () -> Unit, onClickModelWizard: () -> Unit = {}) {
@@ -341,7 +342,7 @@ private fun GeneralTab(
     val allInlineModels = remember(ollamaModels.size, openaiCompatModels.size, currentFilter) {
         val items = mutableListOf<Pair<String, String>>()
         if (currentFilter != "local") {
-            for (m in cloudModels) {
+            for (m in cloudModelsFor(prefs)) {
                 if (!AiServiceSync.hasApiKey(m.second)) continue
                 items.add(m)
             }
@@ -1482,7 +1483,7 @@ private fun LocalTab(
                     val items = mutableListOf<Pair<String, String>>()
                     ollamaModels.forEach { items.add(it to "ollama:$it") }
                     openaiCompatModels.forEach { items.add(it to "openai:$it") }
-                    items.addAll(AiServiceSync.CLOUD_MODELS)
+                    items.addAll(AiServiceSync.cloudModelsWithCustom(prefs))
                     items
                 }
                 ModelPresetsSection(prefs, teal, combinedForLocalTab)
@@ -1690,7 +1691,8 @@ private fun CloudTab(
                     color = teal,
                     fontWeight = FontWeight.Bold
                 )
-                val selectedCloud = cloudModels.firstOrNull { it.second == currentModel }
+                val currentCloudModels = cloudModelsFor(prefs)
+                val selectedCloud = currentCloudModels.firstOrNull { it.second == currentModel }
                 Text(
                     if (isCloud) (selectedCloud?.first ?: currentModel) else "(select a cloud model)",
                     style = MaterialTheme.typography.bodyLarge,
@@ -1707,13 +1709,14 @@ private fun CloudTab(
             }
         }
         if (showModelDialog) {
+            val currentCloudModels = cloudModelsFor(prefs)
             helium314.keyboard.settings.dialogs.ListPickerDialog(
                 onDismissRequest = { showModelDialog = false },
-                items = cloudModels,
+                items = currentCloudModels,
                 onItemSelected = {
                     prefs.edit { putString(Settings.PREF_AI_MODEL, it.second) }
                 },
-                selectedItem = cloudModels.firstOrNull { it.second == currentModel },
+                selectedItem = currentCloudModels.firstOrNull { it.second == currentModel },
                 title = { Text("Default cloud model") },
                 getItemName = { it.first }
             )
@@ -1800,6 +1803,31 @@ private fun CloudTab(
                     testUrl = "https://openrouter.ai/api/v1/models"
                 )
 
+                // OpenRouter custom model IDs
+                var customModels by remember {
+                    mutableStateOf(
+                        prefs.getString(Settings.PREF_OPENROUTER_CUSTOM_MODELS, Defaults.PREF_OPENROUTER_CUSTOM_MODELS)
+                            ?: Defaults.PREF_OPENROUTER_CUSTOM_MODELS
+                    )
+                }
+                androidx.compose.material3.OutlinedTextField(
+                    value = customModels,
+                    onValueChange = {
+                        customModels = it
+                        prefs.edit { putString(Settings.PREF_OPENROUTER_CUSTOM_MODELS, it) }
+                    },
+                    label = { Text("Custom OpenRouter models") },
+                    placeholder = { Text("e.g. anthropic/claude-3.5-sonnet") },
+                    supportingText = { Text("One model ID per line. Shows up in model pickers.") },
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    colors = brandOutlinedTextFieldColors(teal),
+                    minLines = 2,
+                    maxLines = 6,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+
                 // Anthropic API key
                 EditableSecretField(
                     secretKey = Settings.PREF_ANTHROPIC_API_KEY,
@@ -1854,7 +1882,7 @@ private fun CloudTab(
                 // Model Presets section — combined list (cloud + cached local)
                 val combinedForCloudTab = remember(ollamaModels.size) {
                     val items = mutableListOf<Pair<String, String>>()
-                    items.addAll(AiServiceSync.CLOUD_MODELS)
+                    items.addAll(AiServiceSync.cloudModelsWithCustom(prefs))
                     helium314.keyboard.latin.ai.cachedOllamaModels(prefs).forEach {
                         items.add(it.displayName to it.modelValue)
                     }
@@ -2046,7 +2074,7 @@ private fun VoiceTab(
     val allModels = remember(ollamaModels.size, openaiCompatModels.size, currentFilter) {
         val items = mutableListOf<Pair<String, String>>()
         if (currentFilter != "local") {
-            for (m in cloudModels) {
+            for (m in cloudModelsFor(prefs)) {
                 if (!AiServiceSync.hasApiKey(m.second)) continue
                 items.add(m)
             }

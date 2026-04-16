@@ -370,6 +370,31 @@ object AiServiceSync {
     )
 
     /**
+     * Parse user-defined custom OpenRouter model IDs from [Settings.PREF_OPENROUTER_CUSTOM_MODELS].
+     * Each non-empty line (or comma-separated value) is treated as a model ID such as
+     * `anthropic/claude-3.5-sonnet` and becomes a `("modelId (OpenRouter)", "openrouter:modelId")` pair.
+     * Duplicates (same model ID as a built-in entry) are filtered out.
+     */
+    @JvmStatic
+    fun getCustomOpenRouterModels(prefs: SharedPreferences): List<Pair<String, String>> {
+        val raw = prefs.getString(Settings.PREF_OPENROUTER_CUSTOM_MODELS, Defaults.PREF_OPENROUTER_CUSTOM_MODELS)
+            ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        val existing = CLOUD_MODELS.map { it.second }.toSet()
+        return raw.split('\n', ',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .map { id -> "$id (OpenRouter)" to "openrouter:$id" }
+            .filter { it.second !in existing }
+    }
+
+    /** Built-in CLOUD_MODELS plus any user-defined custom OpenRouter models. */
+    @JvmStatic
+    fun cloudModelsWithCustom(prefs: SharedPreferences): List<Pair<String, String>> =
+        CLOUD_MODELS + getCustomOpenRouterModels(prefs)
+
+    /**
      * Check if a cloud model has the required API key configured.
      */
     @JvmStatic
@@ -400,7 +425,7 @@ object AiServiceSync {
             return currentModel
         }
         // Otherwise find the first cloud model with a configured API key
-        return CLOUD_MODELS.firstOrNull { hasApiKey(it.second) }?.second
+        return cloudModelsWithCustom(prefs).firstOrNull { hasApiKey(it.second) }?.second
     }
 
     private fun isLocalBackend(backend: String): Boolean = backend in listOf("ollama", "openai")

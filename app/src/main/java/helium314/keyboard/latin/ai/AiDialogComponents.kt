@@ -136,7 +136,7 @@ fun loadCloudPresets(prefs: SharedPreferences): List<ModelItem> {
 fun loadCloudModels(prefs: SharedPreferences): List<ModelItem> {
     val modelFilter = prefs.getString(Settings.PREF_AI_MODEL_FILTER, Defaults.PREF_AI_MODEL_FILTER)
     if (modelFilter == "local") return emptyList()
-    return AiServiceSync.CLOUD_MODELS
+    return AiServiceSync.cloudModelsWithCustom(prefs)
         .filter { AiServiceSync.hasApiKey(it.second) }
         .map { ModelItem(displayName = it.first, modelValue = it.second) }
 }
@@ -861,7 +861,7 @@ private fun AiVoiceModeContent(
         val modelDisplayName = if (selectedModel.isEmpty()) {
             stringResource(R.string.ai_voice_model_default)
         } else {
-            formatModelDisplayName(selectedModel)
+            formatModelDisplayName(selectedModel, prefs)
         }
         ModelPickerRow(
             currentModelName = modelDisplayName,
@@ -1051,8 +1051,8 @@ private fun AiVoiceModeContent(
 
 }
 
-private fun formatModelDisplayName(modelId: String): String {
-    for (m in AiServiceSync.CLOUD_MODELS) {
+private fun formatModelDisplayName(modelId: String, prefs: SharedPreferences): String {
+    for (m in AiServiceSync.cloudModelsWithCustom(prefs)) {
         if (m.second == modelId) return m.first
     }
     if (modelId.startsWith("ollama:")) {

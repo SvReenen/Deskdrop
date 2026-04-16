@@ -186,6 +186,7 @@ object Defaults {
     const val PREF_GEMINI_API_KEY = ""
     const val PREF_GROQ_API_KEY = ""
     const val PREF_OPENROUTER_API_KEY = ""
+    const val PREF_OPENROUTER_CUSTOM_MODELS = ""
     const val PREF_ANTHROPIC_API_KEY = ""
     const val PREF_OPENAI_API_KEY = ""
     const val PREF_BRAVE_SEARCH_API_KEY = ""
