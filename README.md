@@ -2,10 +2,10 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Android 9.0+](https://img.shields.io/badge/Android-9.0%2B-brightgreen.svg)]()
-[![Release](https://img.shields.io/badge/Release-v1.2.0-orange.svg)](https://github.com/SvReenen/Deskdrop/releases/latest)
+[![Release](https://img.shields.io/github/v/release/SvReenen/Deskdrop?color=orange&label=Release)](https://github.com/SvReenen/Deskdrop/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/SvReenen/Deskdrop/total?color=blue&cacheSeconds=300)](https://github.com/SvReenen/Deskdrop/releases/latest)
 
-An Android keyboard with built-in AI powered by your own local server. Connect to Ollama, LM Studio, or any OpenAI-compatible backend over Tailscale or LAN. Cloud providers available as fallback or standalone.
+Deskdrop is an Android keyboard with AI built in. Use Ollama, any OpenAI-compatible server, or a cloud API key. Built on HeliBoard.
 
 ## Demo
 
@@ -37,6 +37,14 @@ https://github.com/user-attachments/assets/1827cb16-48af-412b-a9a3-d87413f054cb
 https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
 
 </details>
+
+## Why Deskdrop
+
+- **Your backend, your choice.** Ollama, LM Studio, vLLM, llama.cpp, KoboldCpp, or a cloud API key (Groq, Gemini, OpenRouter, Anthropic, OpenAI).
+- **Built for self-hosted setups.** MCP support for Home Assistant and custom tool servers. Primary plus LAN/Tailscale fallback URL.
+- **Built on HeliBoard.** Themes, layouts, dictionaries, clipboard history, glide typing, one-handed mode, split keyboard. All preserved.
+- **No telemetry. No analytics.** Password fields blocked. API keys encrypted (AES-256-GCM). Clipboard and device actions opt-in.
+- **Use it where you already type.** Toolbar buttons, inline `//` commands, voice, home-screen widget, Quick Settings tile, share sheet, Android text selection menu.
 
 ## Features
 
@@ -178,6 +186,26 @@ For a complete technical reference of all settings, shortcuts, and internals, se
 - For local AI: an Ollama or OpenAI-compatible server reachable from your phone (Tailscale recommended)
 - For cloud AI: an API key from any supported provider
 - For voice (Whisper): a Whisper-compatible server (e.g. Speaches)
+
+## FAQ
+
+**Is this on the Play Store?**
+Not yet. Keyboard apps that access network services face a stricter review path, so for now it's distributed as an APK via GitHub Releases.
+
+**Does Deskdrop send my typing anywhere?**
+Only when you explicitly trigger an AI action (Assist, Tone, Voice, Conversation, etc.). Normal typing stays local. If you pick a local backend, nothing leaves your network.
+
+**Do I need Ollama?**
+No. You can use any OpenAI-compatible server, on-device ONNX inference, or a cloud provider. Ollama is the default because it's the easiest to set up.
+
+**Does it work offline?**
+Typing, themes, layouts, clipboard history, and glide typing all work offline. AI features need either a local server on your network or a cloud provider. ONNX runs fully on-device.
+
+**Is there a desktop companion?**
+In development. The idea is cross-device conversation sync over Tailscale, with the keyboard and a Windows app sharing the same chat history. Not released yet.
+
+**Why a fork of HeliBoard?**
+HeliBoard is a mature open-source keyboard with a privacy-focused feature set. Forking gives a solid keyboard foundation so the AI layer can be built on top instead of reinventing input handling.
 
 ## Based on
 
