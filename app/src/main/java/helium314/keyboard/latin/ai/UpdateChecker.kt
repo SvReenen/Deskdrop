@@ -36,6 +36,9 @@ object UpdateChecker {
     private const val EXTRA_VERSION = "version"
 
     fun checkInBackground(context: Context) {
+        val appPrefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(context)
+        if (!appPrefs.getBoolean(helium314.keyboard.latin.settings.Settings.PREF_AUTO_UPDATE_CHECK, true)) return
+
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val lastCheck = prefs.getLong(PREF_LAST_CHECK, 0)
         if (System.currentTimeMillis() - lastCheck < CHECK_INTERVAL_MS) return
@@ -46,6 +49,53 @@ object UpdateChecker {
                 prefs.edit().putLong(PREF_LAST_CHECK, System.currentTimeMillis()).apply()
             } catch (e: Exception) {
                 Log.w(TAG, "Update check failed: ${e.message}")
+            }
+        }.start()
+    }
+
+    /**
+     * Manual check triggered by the user. Ignores the 24h interval and skipped version.
+     * Returns a callback via [onResult]: true if update found, false if up to date, null on error.
+     */
+    data class UpdateResult(val found: Boolean?, val version: String? = null, val downloadUrl: String? = null)
+
+    fun checkNow(context: Context, onResult: (UpdateResult) -> Unit) {
+        Thread {
+            try {
+                val conn = URL(API_URL).openConnection() as HttpURLConnection
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 10_000
+                conn.setRequestProperty("Accept", "application/vnd.github+json")
+                try {
+                    if (conn.responseCode != 200) {
+                        android.os.Handler(android.os.Looper.getMainLooper()).post { onResult(UpdateResult(null)) }
+                        return@Thread
+                    }
+                    val json = conn.inputStream.bufferedReader().readText()
+                    val obj = org.json.JSONObject(json)
+                    val tagName = obj.optString("tag_name", "").removePrefix("v")
+                    val htmlUrl = obj.optString("html_url", "")
+                    val currentVersion = getCurrentVersion(context)
+
+                    if (tagName.isEmpty() || currentVersion == null) {
+                        android.os.Handler(android.os.Looper.getMainLooper()).post { onResult(UpdateResult(null)) }
+                        return@Thread
+                    }
+
+                    if (isNewer(tagName, currentVersion)) {
+                        val downloadUrl = findApkUrl(obj) ?: htmlUrl
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            onResult(UpdateResult(true, tagName, downloadUrl))
+                        }
+                    } else {
+                        android.os.Handler(android.os.Looper.getMainLooper()).post { onResult(UpdateResult(false)) }
+                    }
+                } finally {
+                    conn.disconnect()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Manual update check failed: ${e.message}")
+                android.os.Handler(android.os.Looper.getMainLooper()).post { onResult(UpdateResult(null)) }
             }
         }.start()
     }

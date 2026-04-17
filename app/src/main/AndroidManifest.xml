@@ -178,6 +178,22 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
             android:taskAffinity=""
             android:exported="false" />
 
+        <!-- Voice settings dialog (launched from widget) -->
+        <activity
+            android:name="helium314.keyboard.latin.ai.ExecuteSettingsActivity"
+            android:theme="@style/TransparentActivityTheme"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:exported="false" />
+
+        <activity
+            android:name="helium314.keyboard.latin.ai.VoiceSettingsActivity"
+            android:theme="@style/TransparentActivityTheme"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:exported="false" />
 
         <!-- Voice recording foreground service (QS tile + dictate shortcut) -->
         <service
@@ -206,10 +222,54 @@ SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-only
                 <action android:name="helium314.keyboard.WIDGET_VOICE" />
                 <action android:name="helium314.keyboard.WIDGET_CHAT" />
                 <action android:name="helium314.keyboard.WIDGET_EXECUTE" />
+                <action android:name="helium314.keyboard.WIDGET_VOICE_SETTINGS" />
+                <action android:name="helium314.keyboard.WIDGET_EXECUTE_SETTINGS" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_deskdrop_info" />
+        </receiver>
+
+        <!-- Single-button widgets -->
+        <receiver
+            android:name="helium314.keyboard.latin.ai.DeskdropWidgetVoice"
+            android:label="Deskdrop Voice"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="helium314.keyboard.WIDGET_VOICE" />
+                <action android:name="helium314.keyboard.WIDGET_VOICE_SETTINGS" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_voice_info" />
+        </receiver>
+
+        <receiver
+            android:name="helium314.keyboard.latin.ai.DeskdropWidgetChat"
+            android:label="Deskdrop Chat"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="helium314.keyboard.WIDGET_CHAT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_chat_info" />
+        </receiver>
+
+        <receiver
+            android:name="helium314.keyboard.latin.ai.DeskdropWidgetExecute"
+            android:label="Deskdrop Execute"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="helium314.keyboard.WIDGET_EXECUTE" />
+                <action android:name="helium314.keyboard.WIDGET_EXECUTE_SETTINGS" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_execute_info" />
         </receiver>
 
         <!-- necessary for sending mail attachments, remove when data gathering phase is done (end of 2026 latest) -->

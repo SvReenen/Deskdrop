@@ -41,7 +41,12 @@ import helium314.keyboard.latin.utils.JniUtils
 import helium314.keyboard.latin.utils.GestureDataPromotionReminderDialog
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.UncachedInputMethodManagerUtils
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import helium314.keyboard.latin.utils.cleanUnusedMainDicts
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.dialogs.ConfirmationDialog
@@ -69,6 +74,27 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
     private val cachedDictionaryFile by lazy { File(this.cacheDir.path + File.separator + "temp_dict") }
     private val crashReportFiles = MutableStateFlow<List<File>>(emptyList())
     private var paused = true
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            prefs.edit().putBoolean("notification_permission_asked", true).apply()
+        } else {
+            prefs.edit().putBoolean("notification_permission_asked", true).apply()
+        }
+    }
+
+    private fun requestNotificationPermissionOnce() {
+        if (Build.VERSION.SDK_INT < 33) return
+        if (prefs.getBoolean("notification_permission_asked", false)) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            == PackageManager.PERMISSION_GRANTED) {
+            prefs.edit().putBoolean("notification_permission_asked", true).apply()
+            return
+        }
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -117,6 +143,7 @@ open class SettingsActivity : ComponentActivity(), SharedPreferences.OnSharedPre
                         }
                     else {
                         SettingsNavHost(onClickBack = { this.finish() })
+                        if (setupV2) requestNotificationPermissionOnce()
                         val lastSeenVersion = prefs.getString("whats_new_seen_version", "")
                         var showWhatsNew by rememberSaveable { mutableStateOf(
                             lastSeenVersion != WHATS_NEW_VERSION && setupV2

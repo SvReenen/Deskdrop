@@ -446,7 +446,8 @@ object AiServiceSync {
         Settings.PREF_AI_MODEL,
         "ai_slot_1_model", "ai_slot_2_model", "ai_slot_3_model", "ai_slot_4_model",
         Settings.PREF_AI_INLINE_MODEL, Settings.PREF_AI_CONVERSATION_MODEL,
-        Settings.PREF_AI_VOICE_MODEL, Settings.PREF_AI_MCP_MODEL
+        Settings.PREF_AI_VOICE_MODEL, Settings.PREF_AI_MCP_MODEL,
+        Settings.PREF_AI_TONE_MODEL, Settings.PREF_AI_ASSIST_MODEL
     )
 
     /**
@@ -602,6 +603,21 @@ object AiServiceSync {
     ): String {
         checkCloudFallback(prefs)
         val aiModel = prefs.getString(Settings.PREF_AI_MODEL, Defaults.PREF_AI_MODEL) ?: Defaults.PREF_AI_MODEL
+        return processInlineWithModel(content, instruction, aiModel, prefs, cancelHandle)
+    }
+
+    /** Same as [processInline] but uses the supplied [aiModel] instead of reading PREF_AI_MODEL.
+     *  Used by features like AI Tone that have their own model override. */
+    @JvmStatic
+    @JvmOverloads
+    fun processInlineWithModel(
+        content: String,
+        instruction: String,
+        aiModel: String,
+        prefs: SharedPreferences,
+        cancelHandle: AiCancelRegistry.CancelHandle? = null
+    ): String {
+        checkCloudFallback(prefs)
 
         // Support chaining: "formal //translate" splits into ["formal", "translate"]
         val steps = instruction.split("//").map { it.trim() }.filter { it.isNotEmpty() }

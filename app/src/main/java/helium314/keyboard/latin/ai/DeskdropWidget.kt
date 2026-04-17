@@ -21,6 +21,8 @@ class DeskdropWidget : AppWidgetProvider() {
         private const val ACTION_WIDGET_VOICE = "helium314.keyboard.WIDGET_VOICE"
         private const val ACTION_WIDGET_CHAT = "helium314.keyboard.WIDGET_CHAT"
         private const val ACTION_WIDGET_EXECUTE = "helium314.keyboard.WIDGET_EXECUTE"
+        private const val ACTION_WIDGET_VOICE_SETTINGS = "helium314.keyboard.WIDGET_VOICE_SETTINGS"
+        private const val ACTION_WIDGET_EXECUTE_SETTINGS = "helium314.keyboard.WIDGET_EXECUTE_SETTINGS"
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -33,7 +35,6 @@ class DeskdropWidget : AppWidgetProvider() {
         super.onReceive(context, intent)
         when (intent.action) {
             ACTION_WIDGET_VOICE -> {
-                // Start voice recording via trampoline
                 val i = Intent(context, VoiceTrampolineActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra(VoiceTrampolineActivity.EXTRA_VOICE_ACTION, VoiceTrampolineActivity.ACTION_START)
@@ -41,7 +42,6 @@ class DeskdropWidget : AppWidgetProvider() {
                 context.startActivity(i)
             }
             ACTION_WIDGET_CHAT -> {
-                // Open new chat
                 val i = Intent(context, ConversationActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra(ConversationActivity.EXTRA_ACTION, ConversationActivity.ACTION_NEW_CHAT)
@@ -49,12 +49,25 @@ class DeskdropWidget : AppWidgetProvider() {
                 context.startActivity(i)
             }
             ACTION_WIDGET_EXECUTE -> {
-                // Show floating MCP execute popup with text input
                 val i = Intent(context, VoiceTrampolineActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra(VoiceTrampolineActivity.EXTRA_VOICE_ACTION, VoiceTrampolineActivity.ACTION_TYPE_EXECUTE)
                 }
                 context.startActivity(i)
+            }
+            ACTION_WIDGET_VOICE_SETTINGS -> {
+                context.startActivity(
+                    Intent(context, VoiceSettingsActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+            }
+            ACTION_WIDGET_EXECUTE_SETTINGS -> {
+                context.startActivity(
+                    Intent(context, ExecuteSettingsActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
             }
         }
     }
@@ -62,22 +75,25 @@ class DeskdropWidget : AppWidgetProvider() {
     private fun updateWidget(context: Context, manager: AppWidgetManager, widgetId: Int) {
         val views = RemoteViews(context.packageName, R.layout.widget_deskdrop)
 
-        // Voice button
         views.setOnClickPendingIntent(
             R.id.btn_voice,
             makePendingIntent(context, ACTION_WIDGET_VOICE, 0)
         )
-
-        // Chat button
         views.setOnClickPendingIntent(
             R.id.btn_chat,
             makePendingIntent(context, ACTION_WIDGET_CHAT, 1)
         )
-
-        // Execute button
         views.setOnClickPendingIntent(
             R.id.btn_execute,
             makePendingIntent(context, ACTION_WIDGET_EXECUTE, 2)
+        )
+        views.setOnClickPendingIntent(
+            R.id.btn_voice_settings,
+            makePendingIntent(context, ACTION_WIDGET_VOICE_SETTINGS, 3)
+        )
+        views.setOnClickPendingIntent(
+            R.id.btn_execute_settings,
+            makePendingIntent(context, ACTION_WIDGET_EXECUTE_SETTINGS, 4)
         )
 
         manager.updateAppWidget(widgetId, views)

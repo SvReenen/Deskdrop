@@ -1622,9 +1622,10 @@ public class LatinIME extends InputMethodService implements
                 // Start shimmer while processing
                 startAiShimmer();
                 android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+                final String toneModel = getAiToneModel();
                 new Thread(() -> {
-                    String adjusted = helium314.keyboard.latin.ai.AiServiceSync.processInline(
-                        currentResult[0], fFullPrompt, prefs, null);
+                    String adjusted = helium314.keyboard.latin.ai.AiServiceSync.processInlineWithModel(
+                        currentResult[0], fFullPrompt, toneModel, prefs, null);
                     mHandler.post(() -> {
                         stopAiShimmer();
                         // Re-enable all chips
@@ -1772,6 +1773,31 @@ public class LatinIME extends InputMethodService implements
             return prefs.getString(Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
         }
         return voiceModel;
+    }
+
+    /** Returns the model to use for AI Assist (the main AI button). If an assist-specific
+     *  override is set, use it; otherwise fall back to the main AI model (the system-wide
+     *  default configured under AI Settings → Cloud → Default cloud model). */
+    public String getAiAssistModel() {
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+        helium314.keyboard.latin.ai.AiServiceSync.checkCloudFallback(prefs);
+        String assistModel = prefs.getString(Settings.PREF_AI_ASSIST_MODEL, "");
+        if (assistModel == null || assistModel.isEmpty()) {
+            return prefs.getString(Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        }
+        return assistModel;
+    }
+
+    /** Returns the model to use for AI Tone. If a tone-specific override is set, use it;
+     *  otherwise fall back to the main AI model. Mirrors the Voice pattern. */
+    public String getAiToneModel() {
+        final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(this);
+        helium314.keyboard.latin.ai.AiServiceSync.checkCloudFallback(prefs);
+        String toneModel = prefs.getString(Settings.PREF_AI_TONE_MODEL, "");
+        if (toneModel == null || toneModel.isEmpty()) {
+            return prefs.getString(Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        }
+        return toneModel;
     }
 
     public void startAiVoiceRecognition() {
@@ -2081,6 +2107,11 @@ public class LatinIME extends InputMethodService implements
     public void showAiInstructionDialog() {
         AudioAndHapticFeedbackManager.getInstance().vibrate(20);
         helium314.keyboard.latin.ai.AiDialogComponentsKt.showAiInstructionDialog(this);
+    }
+
+    public void showAiToneModelDialog() {
+        AudioAndHapticFeedbackManager.getInstance().vibrate(20);
+        helium314.keyboard.latin.ai.AiDialogComponentsKt.showAiToneModelDialog(this);
     }
 
     public void showSlotConfigDialog(int slotNumber) {

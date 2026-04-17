@@ -3,7 +3,7 @@
     SPDX-License-Identifier: GPL-3.0-only
 -->
 <resources>
-    <string name="english_ime_name" translatable="false">Deskdrop</string>
+    <string name="english_ime_name" translatable="false">Deskdrop DEV</string>
     <string name="spell_checker_service_name" translatable="false">Deskdrop Spell Checker</string>
     <string name="ime_settings" translatable="false">Deskdrop Settings</string>
 </resources>

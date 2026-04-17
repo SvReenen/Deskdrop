@@ -450,6 +450,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             (listener as? helium314.keyboard.latin.LatinIME)?.showAiVoiceModeDialog()
             return
         }
+        // AI Tone: long-press opens a slim model-only picker (no instruction/prompt)
+        if (tag == ToolbarKey.AI_TONE) {
+            (listener as? helium314.keyboard.latin.LatinIME)?.showAiToneModelDialog()
+            return
+        }
         // AI Conversation: long-press offers bulk-clear of unread reminders
         if (tag == ToolbarKey.AI_CONVERSATION) {
             (listener as? helium314.keyboard.latin.LatinIME)?.showMarkAllRemindersReadDialog()

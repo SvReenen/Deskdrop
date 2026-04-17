@@ -2325,6 +2325,10 @@ public final class InputLogic {
         showAiBriefMessage("Type something first, then tap AI", 1200);
     }
 
+    private void showAiConfigurableEmptyHint() {
+        showAiBriefMessage("Type something first, then tap AI\nLong press this button to configure", 2000);
+    }
+
     /** Show a brief message in the AI preview panel and auto-hide. Replaces Toast for keyboard feedback. Thread-safe. */
     private void showAiBriefMessage(String message, long durationMs) {
         android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -2420,8 +2424,8 @@ public final class InputLogic {
 
         final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
 
-        // Check if AI is configured - if not, show setup message
-        final String aiModel = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        // Check if AI is configured - if not, show setup message (assist may override the main model)
+        final String aiModel = mLatinIME.getAiAssistModel();
         if (aiModel == null || aiModel.isEmpty() || !isAiModelReady(aiModel)) {
             showAiSetupMessage();
             return;
@@ -2446,7 +2450,7 @@ public final class InputLogic {
 
         final String text = fieldText;
         if (text.trim().isEmpty()) {
-            showAiEmptyTextHint();
+            showAiConfigurableEmptyHint();
             return;
         }
 
@@ -2511,9 +2515,9 @@ public final class InputLogic {
             try {
                 final String result;
                 if (fInlineInstruction != null) {
-                    result = helium314.keyboard.latin.ai.AiServiceSync.processInline(fInlineContent, fInlineInstruction, prefs, handle);
+                    result = helium314.keyboard.latin.ai.AiServiceSync.processInlineWithModel(fInlineContent, fInlineInstruction, aiModel, prefs, handle);
                 } else {
-                    result = helium314.keyboard.latin.ai.AiServiceSync.process(text, prefs, handle);
+                    result = helium314.keyboard.latin.ai.AiServiceSync.processWithModel(text, aiModel, prefs, handle);
                 }
 
                 mLatinIME.mHandler.post(() -> {
@@ -2563,9 +2567,9 @@ public final class InputLogic {
                                 try {
                                     final String retryResult;
                                     if (fInlineInstruction != null) {
-                                        retryResult = helium314.keyboard.latin.ai.AiServiceSync.processInline(fInlineContent, fInlineInstruction, prefs, retryHandle);
+                                        retryResult = helium314.keyboard.latin.ai.AiServiceSync.processInlineWithModel(fInlineContent, fInlineInstruction, aiModel, prefs, retryHandle);
                                     } else {
-                                        retryResult = helium314.keyboard.latin.ai.AiServiceSync.process(text, prefs, retryHandle);
+                                        retryResult = helium314.keyboard.latin.ai.AiServiceSync.processWithModel(text, aiModel, prefs, retryHandle);
                                     }
                                     mLatinIME.mHandler.post(() -> {
                                         mLatinIME.stopAiShimmer();
@@ -2607,9 +2611,9 @@ public final class InputLogic {
                                                     try {
                                                         final String rr2;
                                                         if (fInlineInstruction != null) {
-                                                            rr2 = helium314.keyboard.latin.ai.AiServiceSync.processInline(fInlineContent, fInlineInstruction, prefs, rh2);
+                                                            rr2 = helium314.keyboard.latin.ai.AiServiceSync.processInlineWithModel(fInlineContent, fInlineInstruction, aiModel, prefs, rh2);
                                                         } else {
-                                                            rr2 = helium314.keyboard.latin.ai.AiServiceSync.process(text, prefs, rh2);
+                                                            rr2 = helium314.keyboard.latin.ai.AiServiceSync.processWithModel(text, aiModel, prefs, rh2);
                                                         }
                                                         mLatinIME.mHandler.post(() -> {
                                                             mLatinIME.stopAiShimmer();
@@ -2666,9 +2670,9 @@ public final class InputLogic {
     }
 
     private void handleAiTone() {
-        // Check if AI is configured
+        // Check if AI is configured (tone may override the main model via PREF_AI_TONE_MODEL)
         final android.content.SharedPreferences tonePrefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
-        final String toneModel = tonePrefs.getString(helium314.keyboard.latin.settings.Settings.PREF_AI_MODEL, helium314.keyboard.latin.settings.Defaults.PREF_AI_MODEL);
+        final String toneModel = mLatinIME.getAiToneModel();
         if (toneModel == null || toneModel.isEmpty() || !isAiModelReady(toneModel)) {
             showAiSetupMessage();
             return;
@@ -2689,7 +2693,7 @@ public final class InputLogic {
         }
         final String text = fieldText;
         if (text.trim().isEmpty()) {
-            showAiEmptyTextHint();
+            showAiConfigurableEmptyHint();
             return;
         }
 
@@ -2737,10 +2741,11 @@ public final class InputLogic {
                 if (lastPrompt == null || lastInput == null) return;
                 mLatinIME.startAiShimmer();
                 android.content.SharedPreferences retryPrefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
+                final String retryToneModel = mLatinIME.getAiToneModel();
                 new Thread(() -> {
                     try {
-                        String retryResult = helium314.keyboard.latin.ai.AiServiceSync.processInline(
-                            lastInput, lastPrompt, retryPrefs, null);
+                        String retryResult = helium314.keyboard.latin.ai.AiServiceSync.processInlineWithModel(
+                            lastInput, lastPrompt, retryToneModel, retryPrefs, null);
                         mLatinIME.mHandler.post(() -> {
                             mLatinIME.stopAiShimmer();
                             mLatinIME.showAiPreviewInstant(retryResult);
@@ -2793,7 +2798,7 @@ public final class InputLogic {
 
         final String text = fieldText;
         if (text.trim().isEmpty()) {
-            showAiEmptyTextHint();
+            showAiConfigurableEmptyHint();
             return;
         }
 
@@ -2891,6 +2896,17 @@ public final class InputLogic {
         }
 
         final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
+
+        // Show voice-mode discovery hint via Toast the first 3 times voice is used successfully.
+        // Toast is used (not showAiBriefMessage) because it never conflicts with the AI preview
+        // panel or processing indicator, and survives across the AI call.
+        final int hintCount = prefs.getInt(Settings.PREF_AI_VOICE_HINT_SHOWN_COUNT, helium314.keyboard.latin.settings.Defaults.PREF_AI_VOICE_HINT_SHOWN_COUNT);
+        if (hintCount < 3) {
+            android.widget.Toast.makeText(mLatinIME,
+                "Tip: long press the mic button for voice modes",
+                android.widget.Toast.LENGTH_LONG).show();
+            prefs.edit().putInt(Settings.PREF_AI_VOICE_HINT_SHOWN_COUNT, hintCount + 1).apply();
+        }
 
         // Save current field text for undo
         mConnection.finishComposingText();

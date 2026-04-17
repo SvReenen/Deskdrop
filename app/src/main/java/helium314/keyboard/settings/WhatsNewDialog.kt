@@ -47,7 +47,7 @@ data class WhatsNewFeature(
     val inlineIconRes: Int? = null
 )
 
-val WHATS_NEW_VERSION = "1.2.1"
+val WHATS_NEW_VERSION = "1.3"
 
 val WHATS_NEW_FEATURES = listOf(
     WhatsNewFeature(
@@ -79,19 +79,19 @@ val WHATS_NEW_FEATURES = listOf(
         "Create your own //commands and tone chips in Settings > AI > General > Advanced."
     ),
     WhatsNewFeature(
-        "\uD83D\uDD27",
-        "v1.2.1 - Setup improvements",
-        "AI Assist and AI Tone buttons now pulse when no provider is configured, guiding you to setup. Added Test Connection button in AI settings to verify your API keys."
+        "\uD83D\uDCF1",
+        "v1.3 - Home screen widgets",
+        "New individual widgets for Voice, Chat, and Execute. Each with a settings button to configure model and voice mode right from your home screen."
+    ),
+    WhatsNewFeature(
+        "\uD83D\uDD14",
+        "v1.3 - Update notifications",
+        "Deskdrop can now check for updates automatically. Enable it in Settings > About > Auto-check for updates, or use the Check for updates button on the main screen."
     ),
     WhatsNewFeature(
         "\uD83D\uDCA1",
-        "v1.2.1 - Better feedback",
-        "Clearer in-keyboard messages when tapping AI buttons without text, in password fields, or when errors occur. Messages now show inside the keyboard, so they're always visible."
-    ),
-    WhatsNewFeature(
-        "\u2600\uFE0F",
-        "v1.2.1 - Light mode fixes",
-        "Fixed readability issues in light mode: AI preview text, tone chips, scrollbar, and clipboard label are now properly visible. Close button moved to top-right."
+        "v1.3 - Tips carousel",
+        "Discover features with the new tips carousel on the settings screen. Shows a random tip each time you open settings."
     ),
 )
 

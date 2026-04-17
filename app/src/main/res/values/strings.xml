@@ -150,6 +150,11 @@
     <string name="voice_recording_stop">Stop</string>
     <string name="voice_transcribing">Transcribing…</string>
     <string name="widget_description">Quick access to voice, chat and commands</string>
+    <string name="widget_voice_description">Start voice recording</string>
+    <string name="widget_chat_description">Open a new chat</string>
+    <string name="widget_execute_description">Execute a command</string>
+    <string name="auto_update_check">Auto-check for updates</string>
+    <string name="auto_update_check_summary">Periodically check GitHub for new versions</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
     <!-- Settings category title for Preference/Input settings -->

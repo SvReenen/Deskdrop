@@ -148,8 +148,8 @@ fun WelcomeWizard(
                     delay(50)
                 }
                 step = when (selectedMode) {
-                    "local" -> if (!setupDone) { selectedMode = "cloud"; 4 } else { finish(); return@launch }
-                    else -> 11 // Quick start → Groq setup
+                    "local" -> if (!setupDone) { selectedMode = "cloud"; 4 } else { close(); return@launch }
+                    else -> if (!setupDone) 11 else { close(); return@launch } // Quick start → Groq setup (skip if already configured)
                 }
             }
     }

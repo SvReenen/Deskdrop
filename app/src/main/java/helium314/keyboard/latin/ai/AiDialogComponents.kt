@@ -1062,23 +1062,185 @@ private fun formatModelDisplayName(modelId: String, prefs: SharedPreferences): S
 }
 
 // ════════════════════════════════════════════════════════════════════
+// showAiToneModelDialog — slim model-only picker for AI Tone
+// ════════════════════════════════════════════════════════════════════
+
+fun showAiToneModelDialog(ime: LatinIME) {
+    try {
+        val prefs = DeviceProtectedUtils.getSharedPreferences(ime)
+        val currentToneModel = prefs.getString(Settings.PREF_AI_TONE_MODEL, "") ?: ""
+
+        // Build model list: "Use main AI model" (empty) + cloud models + cached local.
+        // Background thread refreshes Ollama/OpenAI-compatible below.
+        val models = mutableListOf<ModelItem>()
+        models.add(ModelItem(displayName = ime.getString(R.string.ai_voice_model_default), modelValue = ""))
+        models.addAll(loadCloudModels(prefs))
+        val cachedLocal = cachedOllamaModels(prefs) + cachedOpenAiCompatibleModels(prefs)
+        models.addAll(cachedLocal)
+
+        val ollamaLoaded = booleanArrayOf(cachedLocal.isNotEmpty())
+        val dialogHolder = arrayOfNulls<AlertDialog>(1)
+
+        val dialog = showImeComposeDialog(
+            ime = ime,
+            chromeless = true,
+            content = {
+                AiToneModelContent(
+                    ime = ime,
+                    prefs = prefs,
+                    initialModel = currentToneModel,
+                    models = models,
+                    ollamaLoaded = ollamaLoaded,
+                    onSave = { model ->
+                        prefs.edit().putString(Settings.PREF_AI_TONE_MODEL, model).apply()
+                        dialogHolder[0]?.dismiss()
+                    },
+                    onCancel = { dialogHolder[0]?.dismiss() }
+                )
+            }
+        )
+        dialogHolder[0] = dialog
+
+        // Fetch Ollama / OpenAI-compat models in background (same pattern as voice dialog)
+        val modelFilter = prefs.getString(Settings.PREF_AI_MODEL_FILTER, Defaults.PREF_AI_MODEL_FILTER)
+        if (modelFilter == "cloud") {
+            ollamaLoaded[0] = true
+        }
+        Thread {
+            if (modelFilter == "cloud") return@Thread
+            val ollamaUrl = AiServiceSync.resolveOllamaBaseUrl(prefs)
+            val ollamaItems = mutableListOf<ModelItem>()
+            try {
+                val ollamaModels = AiServiceSync.fetchOllamaModels(ollamaUrl)
+                for (model in ollamaModels) {
+                    ollamaItems.add(ModelItem(
+                        displayName = "$model${ime.getString(R.string.ai_model_suffix_ollama)}",
+                        modelValue = "ollama:$model"
+                    ))
+                }
+            } catch (_: Exception) {}
+            val openaiItems = fetchOpenAiCompatModelsForPrefs(prefs)
+            ime.mHandler.post {
+                models.removeAll { it.modelValue.startsWith("ollama:") || it.modelValue.startsWith("openai:") }
+                models.addAll(ollamaItems)
+                models.addAll(openaiItems)
+                ollamaLoaded[0] = true
+            }
+        }.start()
+    } catch (e: Exception) {
+        android.util.Log.e("AiDialogs", "showAiToneModelDialog error", e)
+        Toast.makeText(
+            ime,
+            String.format(ime.getString(R.string.ai_error_prefix), e.message ?: "error"),
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+}
+
+@Composable
+private fun AiToneModelContent(
+    ime: LatinIME,
+    prefs: SharedPreferences,
+    initialModel: String,
+    models: MutableList<ModelItem>,
+    ollamaLoaded: BooleanArray,
+    onSave: (model: String) -> Unit,
+    onCancel: () -> Unit
+) {
+    var selectedModel by remember { mutableStateOf(initialModel) }
+    var isOllamaLoading by remember { mutableStateOf(!ollamaLoaded[0]) }
+
+    LaunchedEffect(Unit) {
+        while (!ollamaLoaded[0]) {
+            kotlinx.coroutines.delay(200)
+            isOllamaLoading = !ollamaLoaded[0]
+        }
+        isOllamaLoading = false
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        BrandHeader("AI Tone")
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            val modelDisplayName = if (selectedModel.isEmpty()) {
+                stringResource(R.string.ai_voice_model_default)
+            } else {
+                formatModelDisplayName(selectedModel, prefs)
+            }
+            ModelPickerRow(
+                currentModelName = modelDisplayName,
+                isLoading = isOllamaLoading,
+                onClick = {
+                    if (!ollamaLoaded[0]) {
+                        Toast.makeText(ime, ime.getString(R.string.ai_loading_models), Toast.LENGTH_SHORT).show()
+                        return@ModelPickerRow
+                    }
+                    val snapshot = models.toList()
+                    val names = snapshot.map { it.displayName }.toTypedArray()
+                    val currentIdx = snapshot.indexOfFirst { it.modelValue == selectedModel }.coerceAtLeast(0)
+                    showImePickerDialog(
+                        ime = ime,
+                        title = ime.getString(R.string.ai_choose_model),
+                        items = names,
+                        selectedIndex = currentIdx,
+                        onItemSelected = { which ->
+                            selectedModel = snapshot[which].modelValue
+                        }
+                    )
+                }
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onCancel) {
+                Text(
+                    stringResource(R.string.process_text_cancel),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = { onSave(selectedModel) },
+                colors = brandButtonColors(),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════
 // showAiInstructionDialog
 // ════════════════════════════════════════════════════════════════════
 
 fun showAiInstructionDialog(ime: LatinIME) {
     val prefs = DeviceProtectedUtils.getSharedPreferences(ime)
-    val currentModel = prefs.getString(Settings.PREF_AI_MODEL, Defaults.PREF_AI_MODEL) ?: Defaults.PREF_AI_MODEL
+    // Assist-specific model override: empty string = fall back to the main AI model
+    // (Settings → Cloud → Default cloud model). This mirrors Voice/Tone/Slot patterns.
+    val currentModel = prefs.getString(Settings.PREF_AI_ASSIST_MODEL, "") ?: ""
     val currentInstruction = prefs.getString(Settings.PREF_AI_INSTRUCTION, Defaults.PREF_AI_INSTRUCTION) ?: Defaults.PREF_AI_INSTRUCTION
     val dialogContext = helium314.keyboard.latin.utils.getPlatformDialogThemeContext(ime)
 
     val instrInput = createImeEditText(dialogContext, ime)
 
-    // State holders accessed by both Compose and dialog buttons
+    // State holders accessed by both Compose and dialog buttons.
+    // First entry: "Use main AI model" (empty modelValue = fall back to PREF_AI_MODEL).
     val models = mutableListOf<ModelItem>()
+    models.add(ModelItem(displayName = ime.getString(R.string.ai_voice_model_default), modelValue = ""))
     models.addAll(loadCloudPresets(prefs))
     models.addAll(loadCloudModels(prefs))
 
-    val currentModelName = prefs.getString(Settings.PREF_AI_MODEL + "_name", "") ?: ""
+    val currentModelName = prefs.getString(Settings.PREF_AI_ASSIST_MODEL + "_name", "") ?: ""
     var currentSel = 0
     // First: try exact match on both modelValue + displayName
     if (currentModelName.isNotEmpty()) {
@@ -1136,8 +1298,10 @@ fun showAiInstructionDialog(ime: LatinIME) {
                     val targetValue = selectedValueHolder[0]
                     val targetModel = models.firstOrNull { it.modelValue == targetValue }
                     if (targetModel != null) {
-                        editor.putString(Settings.PREF_AI_MODEL, targetModel.modelValue)
-                        editor.putString(Settings.PREF_AI_MODEL + "_name", targetModel.displayName)
+                        // Write to the assist-specific override (empty = use main AI model).
+                        // The main default lives in PREF_AI_MODEL and is edited via Settings.
+                        editor.putString(Settings.PREF_AI_ASSIST_MODEL, targetModel.modelValue)
+                        editor.putString(Settings.PREF_AI_ASSIST_MODEL + "_name", targetModel.displayName)
                         if (!targetModel.isCustomPreset) {
                             editor.putString(Settings.PREF_AI_INSTRUCTION, instrInput.text.toString())
                         }

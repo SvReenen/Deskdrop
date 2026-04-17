@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:padding="8dp">
+
+    <ImageButton
+        android:id="@+id/btn_execute"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/ic_widget_execute"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Execute"
+        android:scaleType="centerInside"
+        android:padding="4dp" />
+
+    <ImageButton
+        android:id="@+id/btn_execute_settings"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_gravity="top|end"
+        android:src="@drawable/ic_settings_voice_widget"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Execute settings"
+        android:scaleType="centerInside"
+        android:padding="2dp" />
+
+</FrameLayout>

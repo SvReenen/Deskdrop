@@ -32,11 +32,24 @@ import helium314.keyboard.latin.utils.SpannableStringUtils
 import helium314.keyboard.latin.utils.getActivity
 import helium314.keyboard.latin.utils.prefs
 import helium314.keyboard.settings.SettingsContainer
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import helium314.keyboard.settings.SettingsWithoutKey
 import helium314.keyboard.settings.Setting
 import helium314.keyboard.settings.preferences.Preference
+import helium314.keyboard.settings.preferences.SwitchPreference
 import helium314.keyboard.settings.SearchSettingsScreen
 import helium314.keyboard.settings.SettingsActivity
+import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.latin.utils.previewDark
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +66,7 @@ fun AboutScreen(
     val items = listOf(
         SettingsWithoutKey.APP,
         SettingsWithoutKey.VERSION,
+        helium314.keyboard.latin.settings.Settings.PREF_AUTO_UPDATE_CHECK,
         SettingsWithoutKey.LICENSE,
         SettingsWithoutKey.HIDDEN_FEATURES,
         SettingsWithoutKey.GITHUB_WIKI,
@@ -92,6 +106,45 @@ fun createAboutSettings(context: Context) = listOf(
             },
             icon = R.drawable.ic_settings_about
         )
+    },
+    Setting(context, Settings.PREF_AUTO_UPDATE_CHECK, R.string.auto_update_check, R.string.auto_update_check_summary) {
+        val ctx = LocalContext.current
+        val prefs = ctx.prefs()
+        val hasPermission = remember {
+            mutableStateOf(
+                Build.VERSION.SDK_INT < 33 ||
+                ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+        val permissionLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            hasPermission.value = granted
+            if (granted) {
+                prefs.edit().putBoolean(Settings.PREF_AUTO_UPDATE_CHECK, true).apply()
+            }
+        }
+        Column {
+            SwitchPreference(
+                it, true,
+                allowCheckedChange = { checked ->
+                    if (checked && !hasPermission.value) {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        false
+                    } else {
+                        true
+                    }
+                }
+            )
+            if (!hasPermission.value) {
+                Text(
+                    "Notification permission required for automatic update checks.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = androidx.compose.ui.Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                )
+            }
+        }
     },
     Setting(context, SettingsWithoutKey.LICENSE, R.string.license, R.string.gnu_gpl) {
         val ctx = LocalContext.current
