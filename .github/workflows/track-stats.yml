@@ -1,0 +1,57 @@
+name: Track daily stats
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at 00:00 UTC
+  workflow_dispatch:       # Allow manual trigger from Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fetch stats
+        id: stats
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DOWNLOADS=$(gh api repos/${{ github.repository }}/releases --jq '[.[] | [.assets[].download_count] | add] | add')
+          STARS=$(gh api repos/${{ github.repository }} --jq '.stargazers_count')
+          FORKS=$(gh api repos/${{ github.repository }} --jq '.forks_count')
+          ISSUES=$(gh api repos/${{ github.repository }} --jq '.open_issues_count')
+          LINE="{\"date\":\"$DATE\",\"downloads\":$DOWNLOADS,\"stars\":$STARS,\"forks\":$FORKS,\"issues\":$ISSUES}"
+          echo "line=$LINE" >> $GITHUB_OUTPUT
+          echo "Captured: $LINE"
+
+      - name: Append to stats branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATS_LINE: ${{ steps.stats.outputs.line }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code origin stats >/dev/null 2>&1; then
+            # Branch exists - fetch and switch
+            git fetch origin stats
+            git checkout -b stats origin/stats
+          else
+            # First run - create orphan branch
+            git checkout --orphan stats
+            git rm -rf . >/dev/null 2>&1 || true
+            touch stats.jsonl
+          fi
+
+          echo "$STATS_LINE" >> stats.jsonl
+
+          git add stats.jsonl
+          git commit -m "Track stats $(date -u +%Y-%m-%d)"
+          git push -u origin stats
