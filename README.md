@@ -9,7 +9,7 @@ Deskdrop is an Android keyboard with AI built in. Use Ollama, any OpenAI-compati
 
 ## Demo
 
-**AI Toner** - Rewrite selected text with one tap
+**AI Toner** - Rewrite selected text with one tap. All buttons are fully configurable in settings.
 
 https://github.com/user-attachments/assets/865d3014-07d4-4c7c-8474-7e0c29704de5
 
