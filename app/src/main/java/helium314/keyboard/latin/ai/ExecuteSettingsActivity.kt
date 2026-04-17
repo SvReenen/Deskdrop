@@ -92,7 +92,7 @@ class ExecuteSettingsActivity : ComponentActivity() {
                             prefs = prefs,
                             onSave = { model ->
                                 prefs.edit().putString(Settings.PREF_AI_MCP_MODEL, model).apply()
-                                Toast.makeText(this@ExecuteSettingsActivity, "Model saved", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this@ExecuteSettingsActivity, getString(R.string.model_saved), Toast.LENGTH_SHORT).show()
                                 finish()
                             },
                             onCancel = { finish() }
@@ -125,7 +125,7 @@ private fun ExecuteSettingsContent(
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-        BrandHeader("Execute")
+        BrandHeader(stringResource(R.string.widget_execute_description))
 
         Column(
             modifier = Modifier

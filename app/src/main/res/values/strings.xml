@@ -155,6 +155,19 @@
     <string name="widget_execute_description">Execute a command</string>
     <string name="auto_update_check">Auto-check for updates</string>
     <string name="auto_update_check_summary">Periodically check GitHub for new versions</string>
+    <string name="check_for_updates">Check for updates</string>
+    <string name="up_to_date">You\'re up to date.</string>
+    <string name="update_check_failed">Could not check for updates.</string>
+    <string name="download_version">Download v%s</string>
+    <string name="notification_permission_required">Notification permission required for automatic update checks.</string>
+    <string name="update_available_title">Deskdrop %s available</string>
+    <string name="update_available_tap">Tap to download the update</string>
+    <string name="update_later">Later</string>
+    <string name="update_skip">Skip this version</string>
+    <string name="model_saved">Model saved</string>
+    <string name="did_you_know">DID YOU KNOW?</string>
+    <string name="voice_settings">Voice settings</string>
+    <string name="execute_settings">Execute settings</string>
     <!-- Settings screen title for keyboard theme settings -->
     <string name="settings_screen_theme">Theme</string>
     <!-- Settings category title for Preference/Input settings -->

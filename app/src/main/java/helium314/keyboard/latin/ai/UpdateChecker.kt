@@ -205,12 +205,12 @@ object UpdateChecker {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif_reminder)
-            .setContentTitle("Deskdrop $version available")
-            .setContentText("Tap to download the update")
+            .setContentTitle(context.getString(R.string.update_available_title, version))
+            .setContentText(context.getString(R.string.update_available_tap))
             .setContentIntent(updatePending)
             .setAutoCancel(true)
-            .addAction(0, "Later", laterPending)
-            .addAction(0, "Skip this version", skipPending)
+            .addAction(0, context.getString(R.string.update_later), laterPending)
+            .addAction(0, context.getString(R.string.update_skip), skipPending)
             .build()
 
         nm.notify(NOTIFICATION_ID, notification)

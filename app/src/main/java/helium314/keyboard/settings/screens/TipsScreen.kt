@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
@@ -240,7 +241,7 @@ private fun TipCardCompact(tip: TipCardData) {
                 .verticalScroll(scrollState)
         ) {
             Text(
-                "DID YOU KNOW?",
+                stringResource(R.string.did_you_know),
                 color = brandTeal(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,

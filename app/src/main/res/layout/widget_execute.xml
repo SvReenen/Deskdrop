@@ -22,7 +22,7 @@
         android:layout_gravity="top|end"
         android:src="@drawable/ic_settings_voice_widget"
         android:background="?android:attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Execute settings"
+        android:contentDescription="@string/execute_settings"
         android:scaleType="centerInside"
         android:padding="2dp" />
 

@@ -138,7 +138,7 @@ fun createAboutSettings(context: Context) = listOf(
             )
             if (!hasPermission.value) {
                 Text(
-                    "Notification permission required for automatic update checks.",
+                    stringResource(R.string.notification_permission_required),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = androidx.compose.ui.Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)

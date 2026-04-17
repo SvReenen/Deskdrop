@@ -221,19 +221,19 @@ private fun CheckForUpdateButton() {
                         colors = brandButtonColors(),
                         shape = RoundedCornerShape(8.dp),
                     ) {
-                        Text("Download v${result!!.version}")
+                        Text(stringResource(R.string.download_version, result!!.version ?: ""))
                     }
                 }
                 result!!.found == false -> {
                     Text(
-                        "You're up to date.",
+                        stringResource(R.string.up_to_date),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     )
                 }
                 else -> {
                     Text(
-                        "Could not check for updates.",
+                        stringResource(R.string.update_check_failed),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     )
@@ -248,7 +248,7 @@ private fun CheckForUpdateButton() {
                     result = r
                 }
             }) {
-                Text("Check for updates", color = brandTeal())
+                Text(stringResource(R.string.check_for_updates), color = brandTeal())
             }
         }
     }
