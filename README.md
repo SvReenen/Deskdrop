@@ -13,16 +13,16 @@ Deskdrop is an Android keyboard with AI built in. Use Ollama, any OpenAI-compati
 
 https://github.com/user-attachments/assets/635d2ac9-3637-4e7c-8e4c-513b09e0f57f
 
+**Clipboard AI** - Process clipboard content through AI
+
+https://github.com/user-attachments/assets/3f13accb-59d9-4568-9e50-cf3405665bd4
+
 <details>
 <summary>More demos</summary>
 
 **Inline // syntax** - Type instructions directly after your text
 
 https://github.com/user-attachments/assets/9aed41b8-5524-41ef-9fa7-33618d7fcd84
-
-**Clipboard AI** - Process clipboard content through AI
-
-https://github.com/user-attachments/assets/d5d21435-00a3-4295-9f19-fccafa5bade4
 
 **Conversation + Tools** - Ask about the weather, it calls the tool automatically
 
