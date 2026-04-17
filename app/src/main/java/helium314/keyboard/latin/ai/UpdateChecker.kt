@@ -139,7 +139,7 @@ object UpdateChecker {
         }
     }
 
-    private fun isNewer(remote: String, current: String): Boolean {
+    internal fun isNewer(remote: String, current: String): Boolean {
         val r = remote.split(".").mapNotNull { it.toIntOrNull() }
         val c = current.split(".").mapNotNull { it.toIntOrNull() }
         for (i in 0 until maxOf(r.size, c.size)) {

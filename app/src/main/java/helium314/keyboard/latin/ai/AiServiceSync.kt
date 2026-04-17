@@ -242,7 +242,7 @@ object AiServiceSync {
      * the extracted tool calls. If no markers are found, returns the original
      * text and an empty list.
      */
-    private fun extractInlinePseudoToolCalls(
+    internal fun extractInlinePseudoToolCalls(
         text: String
     ): Pair<String, List<AiToolRegistry.ToolCall>> {
         val calls = mutableListOf<AiToolRegistry.ToolCall>()
@@ -267,7 +267,7 @@ object AiServiceSync {
         return stripped to calls
     }
 
-    private fun friendlyHttpError(provider: String, code: Int, body: String? = null): String {
+    internal fun friendlyHttpError(provider: String, code: Int, body: String? = null): String {
         val bodyLower = body?.lowercase().orEmpty()
         // Some providers (notably Gemini) return 400 for invalid API keys.
         if (code == 400 && ("api key" in bodyLower || "api_key" in bodyLower)) {
