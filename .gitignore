@@ -16,3 +16,9 @@ tools/*.txt
 *.diff
 *.sh
 deskdrop-release.keystore
+
+# Stray files in repo root
+/cards_*.png
+/tips_*.png
+/*.png
+/full-logcat.txt
