@@ -120,7 +120,7 @@ Install the APK, open Deskdrop, and the setup wizard walks you through everythin
 3. Choose **Quick Start**
 4. Turn on Deskdrop in your keyboard settings
 5. Switch to Deskdrop as your active keyboard
-6. Get a free API key from [Groq](https://console.groq.com/keys) and paste it
+6. Get a free API key from [Groq](https://console.groq.com/keys) and paste it ([watch guide](https://github.com/SvReenen/Deskdrop/releases/download/v1.3/onboarding_groq_guide_video.mp4))
 7. Done. You can start using AI right away
 
 ### Advanced Setup
