@@ -144,7 +144,7 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
    - Mac/Linux: `OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve`
 
    <details>
-   <summary>Windows environment variables example</summary>
+   <summary>Click here to see where to set this on Windows</summary>
 
    ![Ollama environment variables](docs/ollama-env-variables.png)
 
