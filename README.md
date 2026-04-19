@@ -113,14 +113,15 @@ https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
 
 Install the APK, open Deskdrop, and the setup wizard walks you through everything.
 
-### Quick Start (no setup needed)
+### Quick Start
 
 1. Install the APK and open Deskdrop
 2. Tap **Try it now**
 3. Choose **Quick Start**
 4. Turn on Deskdrop in your keyboard settings
 5. Switch to Deskdrop as your active keyboard
-6. Done. You can start using AI right away
+6. Get a free API key from [Groq](https://console.groq.com/keys) and paste it
+7. Done. You can start using AI right away
 
 ### Advanced Setup
 
@@ -133,17 +134,20 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
 3. Paste your key and continue
 4. The AI demo lets you test your connection before finishing
 
-[Watch the Groq setup guide (1 min)](https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/groq-guide.mp4)
+[Watch the Groq setup guide (1 min)](https://github.com/SvReenen/Deskdrop/releases/download/v1.3/groq-guide.mp4)
 
 **Local path (Ollama)**
 
 1. Make sure Ollama is running on your computer
-2. Choose **Local** on the setup screen
-3. Enter your Ollama URL (default: `http://localhost:11434`)
-4. Tap **Test connection** to verify
-5. Pick a model from the list
-6. Optional: set an alternate connection for Tailscale or LAN access
-7. The AI demo lets you test your setup before finishing
+2. Set Ollama to accept connections from your phone:
+   - Windows: set environment variables `OLLAMA_HOST=0.0.0.0:11434` and `OLLAMA_ORIGINS=*` (System Properties > Environment Variables), then restart Ollama
+   - Mac/Linux: `OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve`
+3. Choose **Local** on the setup screen
+4. Enter your computer's IP address (e.g. `http://192.168.1.100:11434`)
+5. Tap **Test connection** to verify
+6. Pick a model from the list
+7. Optional: set an alternate connection for Tailscale or LAN access
+8. The AI demo lets you test your setup before finishing
 
 Both paths include an optional personalization step where you can tell the AI about your writing style and language preferences. This helps AI responses sound more like you.
 
