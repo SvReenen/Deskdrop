@@ -142,6 +142,13 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
 2. Set Ollama to accept connections from your phone:
    - Windows: set environment variables `OLLAMA_HOST=0.0.0.0:11434` and `OLLAMA_ORIGINS=*` (System Properties > Environment Variables), then restart Ollama
    - Mac/Linux: `OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve`
+
+   <details>
+   <summary>Windows environment variables example</summary>
+
+   ![Ollama environment variables](docs/ollama-env-variables.png)
+
+   </details>
 3. Choose **Local** on the setup screen
 4. Enter your computer's IP address (e.g. `http://192.168.1.100:11434`)
 5. Tap **Test connection** to verify
