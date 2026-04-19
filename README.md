@@ -120,7 +120,7 @@ Install the APK, open Deskdrop, and the setup wizard walks you through everythin
 3. Choose **Quick Start**
 4. Turn on Deskdrop in your keyboard settings
 5. Switch to Deskdrop as your active keyboard
-6. Get a free API key from [Groq](https://console.groq.com/keys) and paste it ([watch guide](https://github.com/SvReenen/Deskdrop/releases/download/v1.3/onboarding_groq_guide_video.mp4))
+6. Get a free API key from [Groq](https://console.groq.com/keys) and paste it ([watch guide](docs/groq-guide.mp4))
 7. Done. You can start using AI right away
 
 ### Advanced Setup
@@ -130,7 +130,7 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
 **Cloud path (Groq / Gemini)**
 
 1. Choose **Cloud** on the setup screen
-2. Get a free API key from Groq or Gemini ([watch guide](https://github.com/SvReenen/Deskdrop/releases/download/v1.3/onboarding_groq_guide_video.mp4))
+2. Get a free API key from Groq or Gemini ([watch guide](docs/groq-guide.mp4))
 3. Paste your key and continue
 4. The AI demo lets you test your connection before finishing
 
