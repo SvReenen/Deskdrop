@@ -170,6 +170,9 @@ dependencies {
     // onnx runtime for on-device AI
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.3")
 
+    // QR code scanning for pairing
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
     // test
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")

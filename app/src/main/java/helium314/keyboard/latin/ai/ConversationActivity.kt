@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import helium314.keyboard.latin.settings.Defaults
 import helium314.keyboard.latin.settings.Settings
@@ -211,6 +212,19 @@ class ConversationActivity : ComponentActivity() {
         AiServiceSync.setContext(this)
         enableEdgeToEdge()
         launchIntent = parseIntent(intent)
+
+        // Auto-sync bij openen
+        val prefs = DeviceProtectedUtils.getSharedPreferences(this)
+        if (prefs.getBoolean(Settings.PREF_SYNC_ENABLED, false)) {
+            val url = prefs.getString(Settings.PREF_SYNC_SERVER_URL, "") ?: ""
+            val token = prefs.getString(Settings.PREF_SYNC_TOKEN, "") ?: ""
+            if (url.isNotBlank() && token.isNotBlank()) {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    try { SyncManager.sync(this@ConversationActivity, url, token) } catch (_: Exception) {}
+                }
+            }
+        }
+
         setContent {
             Theme {
                 ConversationScreen(
@@ -355,8 +369,15 @@ private fun ConversationScreen(
     // Initialize ViewModel models + chat list on first composition
     LaunchedEffect(Unit) {
         vm.initModels()
+        vm.initTts()
         vm.refreshModels()
         vm.refreshChatList()
+    }
+
+    // Periodieke sync starten/stoppen
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        vm.startPeriodicSync()
+        onDispose { vm.stopPeriodicSync() }
     }
 
     // Refresh models when returning from settings (e.g. after adding a new API key)
@@ -872,6 +893,19 @@ private fun ConversationScreen(
                             )
                         }
                     }
+                }
+                IconButton(onClick = {
+                    vm.ttsEnabled = !vm.ttsEnabled
+                    if (!vm.ttsEnabled) TtsService.stop()
+                }) {
+                    Icon(
+                        painter = painterResource(
+                            if (vm.ttsEnabled) R.drawable.ic_tts_on else R.drawable.ic_tts_off
+                        ),
+                        contentDescription = "Text-to-speech",
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
                 IconButton(onClick = { vm.drawerOpen = true }) {
                     Box {

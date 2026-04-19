@@ -35,12 +35,15 @@ object ConversationStore {
     )
 
     data class StoredMessage(
+        val id: String = UUID.randomUUID().toString(),
         val role: String,
         val content: String,
         val modelLabel: String,
         val isError: Boolean,
         val attachments: List<StoredAttachment> = emptyList(),
-        val tokenCount: Int? = null
+        val tokenCount: Int? = null,
+        val sortOrder: Int = 0,
+        val createdAt: Long = System.currentTimeMillis()
     )
 
     data class StoredChat(
@@ -157,12 +160,15 @@ object ConversationStore {
                 } else emptyList()
                 msgs.add(
                     StoredMessage(
+                        id = m.optString("id", UUID.randomUUID().toString()),
                         role = m.optString("role"),
                         content = m.optString("content"),
                         modelLabel = m.optString("modelLabel"),
                         isError = m.optBoolean("isError", false),
                         attachments = atts,
-                        tokenCount = if (m.has("tokenCount")) m.optInt("tokenCount") else null
+                        tokenCount = if (m.has("tokenCount")) m.optInt("tokenCount") else null,
+                        sortOrder = m.optInt("sortOrder", i),
+                        createdAt = m.optLong("createdAt", 0L)
                     )
                 )
             }
@@ -185,12 +191,15 @@ object ConversationStore {
     @Synchronized
     fun save(context: Context, chat: StoredChat) {
         val msgsArr = JSONArray()
-        for (m in chat.messages) {
+        for ((i, m) in chat.messages.withIndex()) {
             msgsArr.put(JSONObject().apply {
+                put("id", m.id)
                 put("role", m.role)
                 put("content", m.content)
                 put("modelLabel", m.modelLabel)
                 put("isError", m.isError)
+                put("sortOrder", if (m.sortOrder > 0) m.sortOrder else i)
+                put("createdAt", if (m.createdAt > 0) m.createdAt else chat.createdAt)
                 if (m.attachments.isNotEmpty()) {
                     val arr = JSONArray()
                     for (a in m.attachments) {

@@ -103,6 +103,10 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_AI_VOICE_HINT_SHOWN_COUNT = "ai_voice_hint_shown_count";
     public static final String PREF_AI_MCP_MODEL = "ai_mcp_model";
     public static final String PREF_AUTO_UPDATE_CHECK = "auto_update_check";
+    public static final String PREF_TTS_ENABLED = "tts_enabled";
+    public static final String PREF_TTS_ENGINE = "tts_engine";
+    public static final String PREF_ELEVENLABS_API_KEY = "elevenlabs_api_key";
+    public static final String PREF_ELEVENLABS_VOICE = "elevenlabs_voice";
     public static final String PREF_AI_PROMPT_ALIASES = "ai_prompt_aliases";
     public static final String PREF_AI_TONE_CHIPS = "ai_tone_chips";
     public static final String PREF_AI_TONE_MODEL = "ai_tone_model";
@@ -111,6 +115,9 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_WHISPER_URL = "whisper_url";
     public static final String PREF_WHISPER_URL_FALLBACK = "whisper_url_fallback";
     public static final String PREF_WHISPER_MODEL = "whisper_model";
+    public static final String PREF_SYNC_SERVER_URL = "sync_server_url";
+    public static final String PREF_SYNC_TOKEN = "sync_token";
+    public static final String PREF_SYNC_ENABLED = "sync_enabled";
     public static final String PREF_DESKDROP_ONBOARDING_DONE = "deskdrop_onboarding_done";
     public static final String PREF_DESKDROP_SETUP_V2 = "deskdrop_setup_v2";
     public static final String PREF_LAYOUT_PREFIX = "layout_";

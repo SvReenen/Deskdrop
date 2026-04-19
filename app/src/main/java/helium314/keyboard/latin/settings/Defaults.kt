@@ -223,6 +223,9 @@ object Defaults {
     const val PREF_WHISPER_URL = ""
     const val PREF_WHISPER_URL_FALLBACK = ""
     const val PREF_WHISPER_MODEL = "Systran/faster-whisper-base"
+    const val PREF_SYNC_SERVER_URL = ""
+    const val PREF_SYNC_TOKEN = ""
+    const val PREF_SYNC_ENABLED = false
     const val PREF_DESKDROP_ONBOARDING_DONE = false
 
     // Default voice mode prompts (used as fallback when no custom prompt is set)

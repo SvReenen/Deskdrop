@@ -152,6 +152,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     var inputText by mutableStateOf("")
     var isSending by mutableStateOf(false)
     var activeCancelHandle by mutableStateOf<AiCancelRegistry.CancelHandle?>(null)
+    var ttsEnabled by mutableStateOf(false)
+
+    fun initTts() {
+        ttsEnabled = false
+        TtsService.init(appContext)
+    }
     var replyToContent by mutableStateOf<String?>(null)
 
     // Multimodal attachments queued for the next user message
@@ -278,6 +284,40 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.IO) { ConversationStore.save(appContext, stored) }
             chatContentCache.remove(stored.id)
             refreshChatListSync()
+            triggerAutoSync()
+        }
+    }
+
+    private var syncJob: kotlinx.coroutines.Job? = null
+
+    fun startPeriodicSync() {
+        if (syncJob != null) return
+        syncJob = viewModelScope.launch {
+            while (true) {
+                delay(15_000) // elke 15 seconden
+                triggerAutoSync()
+            }
+        }
+    }
+
+    fun stopPeriodicSync() {
+        syncJob?.cancel()
+        syncJob = null
+    }
+
+    private fun triggerAutoSync() {
+        val syncEnabled = prefs.getBoolean(Settings.PREF_SYNC_ENABLED, false)
+        if (!syncEnabled) return
+        val token = prefs.getString(Settings.PREF_SYNC_TOKEN, "") ?: ""
+        if (token.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val url = SyncManager.resolveServerUrl(appContext) ?: return@launch
+                val result = SyncManager.sync(appContext, url, token)
+                if (result.success && result.pulled > 0) {
+                    refreshChatList()
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -431,6 +471,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                                 isSending = false
                                 activeCancelHandle = null
                                 persistCurrentChat(text.ifBlank { "Image" }, model.modelValue)
+                                if (ttsEnabled) TtsService.speak(cleanFinal, prefs, appContext)
                             }
                         },
                         { errMsg ->

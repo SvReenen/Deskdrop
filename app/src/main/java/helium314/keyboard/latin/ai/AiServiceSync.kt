@@ -124,7 +124,7 @@ object AiServiceSync {
     @Volatile private var cachedOllamaResolvedExpiry: Long = 0L
     private const val OLLAMA_URL_CACHE_MS = 30_000L
 
-    private fun probeOllama(baseUrl: String, timeoutMs: Int = 1500): Boolean {
+    private fun probeOllama(baseUrl: String, timeoutMs: Int = 5000): Boolean {
         if (baseUrl.isBlank()) return false
         var conn: HttpURLConnection? = null
         return try {
@@ -133,8 +133,12 @@ object AiServiceSync {
             conn.connectTimeout = timeoutMs
             conn.readTimeout = timeoutMs
             conn.requestMethod = "GET"
-            conn.responseCode == 200
-        } catch (_: Exception) {
+            val code = conn.responseCode
+            val ok = code == 200
+            if (!ok) Log.d("CloudFallback", "probeOllama $baseUrl failed: HTTP $code")
+            ok
+        } catch (e: Exception) {
+            Log.d("CloudFallback", "probeOllama $baseUrl failed: ${e.javaClass.simpleName}: ${e.message}")
             false
         } finally {
             try { conn?.disconnect() } catch (_: Exception) {}
@@ -329,7 +333,10 @@ object AiServiceSync {
             invalidateOpenAiCompatUrlCache()
         }
         val msg = (e.message ?: "").lowercase()
-        val target = if (isLocal) "$provider not reachable — check IP/port/Tailscale"
+        val ollamaHint = if (isLocal && (provider == "Ollama" || provider == "ollama"))
+            ". If using Ollama, set OLLAMA_HOST=0.0.0.0 and OLLAMA_ORIGINS=* — see github.com/SvReenen/Deskdrop#getting-started"
+            else ""
+        val target = if (isLocal) "$provider not reachable — check IP/port/Tailscale$ollamaHint"
                      else "Cannot reach $provider — check your internet connection"
         return when {
             e is UnknownHostException ||
@@ -440,6 +447,7 @@ object AiServiceSync {
     @Volatile private var cachedLocalReachable = true
     @Volatile private var cachedLocalReachableExpiry = 0L
     private const val LOCAL_REACHABLE_CACHE_MS = 30_000L
+    @Volatile private var fallbackProbeRunning = false
 
     /** All model pref keys that should be overridden during cloud fallback. */
     private val MODEL_PREF_KEYS = listOf(
@@ -467,7 +475,13 @@ object AiServiceSync {
 
         val now = System.currentTimeMillis()
         if (now < cachedLocalReachableExpiry) return // use cached state, prefs already correct
+        if (fallbackProbeRunning) {
+            Log.d("CloudFallback", "skipping, probe already running")
+            return
+        }
 
+        fallbackProbeRunning = true
+        try {
         // Determine which local backend(s) the user has configured
         val ollamaUrl = normalizeOllamaUrl(prefs.getString(Settings.PREF_OLLAMA_URL, Defaults.PREF_OLLAMA_URL) ?: "")
         val ollamaFallback = normalizeOllamaUrl(prefs.getString(Settings.PREF_OLLAMA_URL_FALLBACK, "") ?: "")
@@ -483,12 +497,18 @@ object AiServiceSync {
         val reachable = ollamaReachable && openaiReachable
         cachedLocalReachable = reachable
         cachedLocalReachableExpiry = now + LOCAL_REACHABLE_CACHE_MS
+        Log.d("CloudFallback", "probe done, ollama=$ollamaReachable, openai=$openaiReachable, reachable=$reachable")
 
         val fallbackActive = prefs.getBoolean(FALLBACK_ACTIVE_KEY, false)
         if (!reachable && !fallbackActive) {
+            Log.d("CloudFallback", "ACTIVATING (server unreachable)")
             activateCloudFallback(prefs)
         } else if (reachable && fallbackActive) {
+            Log.d("CloudFallback", "DEACTIVATING (server back)")
             deactivateCloudFallback(prefs)
+        }
+        } finally {
+            fallbackProbeRunning = false
         }
     }
 

@@ -10,6 +10,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +40,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
@@ -137,7 +146,7 @@ fun AISettingsScreen(onClickBack: () -> Unit, onClickModelWizard: () -> Unit = {
     }
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("General", "Local", "Cloud", "Voice")
+    val tabs = listOf("General", "Local", "Cloud", "Voice", "Sync")
     val teal = brandTeal()
 
     SearchSettingsScreen(
@@ -146,10 +155,11 @@ fun AISettingsScreen(onClickBack: () -> Unit, onClickModelWizard: () -> Unit = {
         settings = emptyList(),
         content = {
             Column(Modifier.imePadding()) {
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.surface,
                     contentColor = teal,
+                    edgePadding = 12.dp,
                     indicator = { tabPositions ->
                         if (selectedTab < tabPositions.size) {
                             TabRowDefaults.SecondaryIndicator(
@@ -186,6 +196,7 @@ fun AISettingsScreen(onClickBack: () -> Unit, onClickModelWizard: () -> Unit = {
                     )
                     2 -> CloudTab(prefs, ollamaModels)
                     3 -> VoiceTab(prefs, ollamaModels, openaiCompatModels)
+                    4 -> SyncTab(prefs, scope)
                 }
             }
         }
@@ -2126,6 +2137,156 @@ private fun VoiceTab(
             )
         }
         VoicePromptsSection(prefs)
+        TtsSection(prefs, teal)
+    }
+}
+
+@Composable
+private fun TtsSection(prefs: android.content.SharedPreferences, teal: Color) {
+    BrandCard {
+        Column {
+            Text(
+                "Text-to-Speech",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = teal
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Enable TTS with the speaker icon in the chat screen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+            Spacer(Modifier.height(8.dp))
+
+            val ttsEngine = remember { mutableStateOf(prefs.getString(Settings.PREF_TTS_ENGINE, "android") ?: "android") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        ttsEngine.value = "android"
+                        prefs.edit().putString(Settings.PREF_TTS_ENGINE, "android").apply()
+                    }
+                ) {
+                    RadioButton(
+                        selected = ttsEngine.value == "android",
+                        onClick = {
+                            ttsEngine.value = "android"
+                            prefs.edit().putString(Settings.PREF_TTS_ENGINE, "android").apply()
+                        },
+                        colors = RadioButtonDefaults.colors(selectedColor = teal)
+                    )
+                    Text("Android TTS", style = MaterialTheme.typography.bodyMedium)
+                }
+                Spacer(Modifier.width(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        ttsEngine.value = "elevenlabs"
+                        prefs.edit().putString(Settings.PREF_TTS_ENGINE, "elevenlabs").apply()
+                    }
+                ) {
+                    RadioButton(
+                        selected = ttsEngine.value == "elevenlabs",
+                        onClick = {
+                            ttsEngine.value = "elevenlabs"
+                            prefs.edit().putString(Settings.PREF_TTS_ENGINE, "elevenlabs").apply()
+                        },
+                        colors = RadioButtonDefaults.colors(selectedColor = teal)
+                    )
+                    Text("ElevenLabs", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            if (ttsEngine.value == "elevenlabs") {
+                Spacer(Modifier.height(8.dp))
+                EditableSecretField(
+                    secretKey = Settings.PREF_ELEVENLABS_API_KEY,
+                    label = "ElevenLabs API key",
+                    placeholder = "Paste your API key"
+                )
+                Text(
+                    "Free tier: 10,000 characters/month. Get a key at elevenlabs.io",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                val voices = listOf(
+                    "nPczCjzI2devNBz1zQrb" to "Brian (deep male)",
+                    "onwK4e9ZLuTAKqWW03F9" to "Daniel (British broadcaster)",
+                    "pNInz6obpgDQGcFmaJgB" to "Adam (dominant male)",
+                    "cjVigY5qzO86Huf0OWal" to "Eric (smooth male)",
+                    "IKne3meq5aSn9XLyUdCD" to "Charlie (deep, energetic)",
+                    "TX3LPaxmHKxFdv7VOQHJ" to "Liam (casual male)",
+                    "pqHfZKP75CvOlQylNhV4" to "Bill (wise, mature)",
+                    "EXAVITQu4vr4xnSDxMaL" to "Sarah (confident female)",
+                    "Xb7hH8MSUJpSbSDYk0k2" to "Alice (British female)",
+                    "pFZP5JQG7iQjIQuC4Bku" to "Lily (British actress)",
+                    "JBFqnCBsd6RMkjVDRZzb" to "George (British storyteller)",
+                )
+                val currentVoice = remember { mutableStateOf(prefs.getString(Settings.PREF_ELEVENLABS_VOICE, "nPczCjzI2devNBz1zQrb") ?: "nPczCjzI2devNBz1zQrb") }
+                var voiceDropdownOpen by remember { mutableStateOf(false) }
+                var customVoiceId by remember { mutableStateOf(prefs.getString("elevenlabs_custom_voice_id", "") ?: "") }
+
+                Text(
+                    "Voice",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Box {
+                    val allVoices = voices + if (customVoiceId.isNotBlank()) listOf(customVoiceId to "Custom ($customVoiceId)") else emptyList()
+                    TextButton(
+                        onClick = { voiceDropdownOpen = true },
+                        colors = brandButtonColors(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = (allVoices.firstOrNull { it.first == currentVoice.value }?.second ?: "Brian") + "  \u25BE",
+                            color = Color.White
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = voiceDropdownOpen,
+                        onDismissRequest = { voiceDropdownOpen = false }
+                    ) {
+                        allVoices.forEach { (id, name) ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = {
+                                    currentVoice.value = id
+                                    prefs.edit().putString(Settings.PREF_ELEVENLABS_VOICE, id).apply()
+                                    voiceDropdownOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Custom voice ID",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = customVoiceId,
+                    onValueChange = {
+                        customVoiceId = it
+                        prefs.edit().putString("elevenlabs_custom_voice_id", it).apply()
+                    },
+                    placeholder = { Text("Paste voice ID from elevenlabs.io", style = MaterialTheme.typography.bodySmall) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = teal,
+                        cursorColor = teal
+                    )
+                )
+            }
+        }
     }
 }
 
@@ -2993,6 +3154,269 @@ private fun McpServersSection(
                 ) { Text("Cancel") }
             }
         )
+    }
+}
+
+// =============================================================================
+// Sync Tab
+// =============================================================================
+
+@Composable
+private fun SyncTab(prefs: android.content.SharedPreferences, scope: kotlinx.coroutines.CoroutineScope) {
+    val teal = brandTeal()
+    val ctx = LocalContext.current
+    var syncStatus by remember { mutableStateOf("") }
+    var isSyncing by remember { mutableStateOf(false) }
+    var lastSync by remember { mutableStateOf(
+        helium314.keyboard.latin.ai.SyncManager.getLastSyncTime(ctx)
+    ) }
+    var isPaired by remember { mutableStateOf(helium314.keyboard.latin.ai.SyncManager.isPaired(ctx)) }
+    var discoveredServer by remember { mutableStateOf<helium314.keyboard.latin.ai.DiscoveryListener.DiscoveredServer?>(null) }
+    var isDiscovering by remember { mutableStateOf(false) }
+
+    // QR scanner launcher
+    val qrLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val raw = result.data?.getStringExtra(helium314.keyboard.latin.ai.QrScannerActivity.RESULT_QR_DATA) ?: return@rememberLauncherForActivityResult
+            try {
+                val obj = org.json.JSONObject(raw)
+                val token = obj.optString("token", "")
+                val port = obj.optInt("port", 5391)
+                val tsIp = obj.optString("tailscale", "")
+                val hostname = obj.optString("hostname", "")
+                val lanArr = obj.optJSONArray("lan")
+                val lanIps = mutableListOf<String>()
+                if (lanArr != null) {
+                    for (i in 0 until lanArr.length()) {
+                        lanArr.optString(i)?.let { if (it.isNotBlank()) lanIps.add(it) }
+                    }
+                }
+
+                if (token.isNotBlank()) {
+                    helium314.keyboard.latin.ai.SyncManager.savePairing(ctx, token, lanIps, tsIp, port, hostname)
+                    // Set server URL to first available
+                    val url = if (lanIps.isNotEmpty()) "http://${lanIps[0]}:$port"
+                              else if (tsIp.isNotBlank()) "http://$tsIp:$port"
+                              else ""
+                    if (url.isNotBlank()) {
+                        prefs.edit().putString(Settings.PREF_SYNC_SERVER_URL, url).apply()
+                    }
+                    isPaired = true
+                    syncStatus = "Paired with $hostname!"
+                }
+            } catch (_: Exception) {
+                syncStatus = "Invalid QR code"
+            }
+        }
+    }
+    val pairedHostname = remember {
+        ctx.getSharedPreferences("deskdrop_sync", Context.MODE_PRIVATE)
+            .getString("paired_hostname", "") ?: ""
+    }
+
+    // Auto-discovery bij openen
+    LaunchedEffect(Unit) {
+        if (!isPaired) {
+            isDiscovering = true
+            discoveredServer = helium314.keyboard.latin.ai.DiscoveryListener.listenOnce()
+            isDiscovering = false
+        }
+    }
+
+    Column(
+        Modifier
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Desktop Sync", style = MaterialTheme.typography.titleMedium, color = teal)
+        Text(
+            "Sync conversations with the Deskdrop desktop app",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+
+        if (isPaired) {
+            // Paired state
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(teal.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text("Connected to", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                Text(pairedHostname.ifBlank { "Desktop" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = teal)
+            }
+
+            // Sync button
+            Button(
+                onClick = {
+                    isSyncing = true
+                    syncStatus = "Syncing..."
+                    scope.launch {
+                        // Resolve best URL first
+                        val url = helium314.keyboard.latin.ai.SyncManager.resolveServerUrl(ctx)
+                        if (url == null) {
+                            syncStatus = "Error: desktop not reachable"
+                            isSyncing = false
+                            return@launch
+                        }
+                        val token = prefs.getString(Settings.PREF_SYNC_TOKEN, "") ?: ""
+                        val result = helium314.keyboard.latin.ai.SyncManager.sync(ctx, url, token)
+                        isSyncing = false
+                        lastSync = helium314.keyboard.latin.ai.SyncManager.getLastSyncTime(ctx)
+                        syncStatus = if (result.success)
+                            "Synced: ${result.pulled} pulled, ${result.pushed} pushed"
+                        else
+                            "Error: ${result.error ?: "Unknown"}"
+                    }
+                },
+                enabled = !isSyncing,
+                colors = brandButtonColors()
+            ) {
+                if (isSyncing) {
+                    CircularProgressIndicator(Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(if (isSyncing) "Syncing..." else "Sync now")
+            }
+
+            // Unpair
+            OutlinedButton(
+                onClick = {
+                    prefs.edit()
+                        .putBoolean(Settings.PREF_SYNC_ENABLED, false)
+                        .putString(Settings.PREF_SYNC_TOKEN, "")
+                        .putString(Settings.PREF_SYNC_SERVER_URL, "")
+                        .apply()
+                    ctx.getSharedPreferences("deskdrop_sync", Context.MODE_PRIVATE).edit().clear().apply()
+                    isPaired = false
+                    syncStatus = ""
+                },
+                colors = brandOutlinedButtonColors()
+            ) { Text("Unpair") }
+
+            // Manual settings (collapsed)
+            EditablePrefField(prefs = prefs, prefKey = Settings.PREF_SYNC_SERVER_URL, label = "Server URL", placeholder = "auto", singleLine = true)
+
+        } else {
+            // Not paired
+            if (isDiscovering) {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(Modifier.size(16.dp), color = teal, strokeWidth = 2.dp)
+                    Text("Searching for Deskdrop on your network...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+
+            if (discoveredServer != null) {
+                val server = discoveredServer!!
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(teal.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Deskdrop found!", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = teal)
+                        Text(server.hostname, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    }
+                }
+            }
+
+            // Scan QR button
+            Button(
+                onClick = {
+                    val intent = android.content.Intent(ctx, helium314.keyboard.latin.ai.QrScannerActivity::class.java)
+                    qrLauncher.launch(intent)
+                },
+                colors = brandButtonColors(),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Scan QR code from desktop") }
+
+            // Manual pairing
+            Spacer(Modifier.height(8.dp))
+            Text("Manual setup", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+
+            EditablePrefField(prefs = prefs, prefKey = Settings.PREF_SYNC_SERVER_URL, label = "Server URL", placeholder = "http://192.168.x.x:5391", singleLine = true)
+            EditablePrefField(prefs = prefs, prefKey = Settings.PREF_SYNC_TOKEN, label = "Token", placeholder = "Paste from desktop", singleLine = true)
+
+            Button(
+                onClick = {
+                    val url = prefs.getString(Settings.PREF_SYNC_SERVER_URL, "") ?: ""
+                    val token = prefs.getString(Settings.PREF_SYNC_TOKEN, "") ?: ""
+                    if (url.isBlank() || token.isBlank()) {
+                        syncStatus = "Fill in URL and token"
+                        return@Button
+                    }
+                    syncStatus = "Connecting..."
+                    scope.launch {
+                        val ok = withContext(Dispatchers.IO) { helium314.keyboard.latin.ai.SyncClient.testConnection(url, token) }
+                        if (ok) {
+                            val lanIps = discoveredServer?.lanIps ?: listOf(java.net.URI(url).host)
+                            val tsIp = discoveredServer?.tailscaleIp ?: ""
+                            val port = discoveredServer?.port ?: try { java.net.URI(url).port } catch (_: Exception) { 5391 }
+                            val hostname = discoveredServer?.hostname ?: ""
+                            helium314.keyboard.latin.ai.SyncManager.savePairing(ctx, token, lanIps, tsIp, port, hostname)
+                            isPaired = true
+                            syncStatus = "Paired!"
+                        } else {
+                            syncStatus = "Connection failed"
+                        }
+                    }
+                },
+                colors = brandButtonColors()
+            ) { Text("Connect") }
+
+            // Retry discovery
+            if (!isDiscovering && discoveredServer == null) {
+                OutlinedButton(
+                    onClick = {
+                        isDiscovering = true
+                        scope.launch {
+                            discoveredServer = helium314.keyboard.latin.ai.DiscoveryListener.listenOnce()
+                            isDiscovering = false
+                        }
+                    },
+                    colors = brandOutlinedButtonColors()
+                ) { Text("Search again") }
+            }
+        }
+
+        // Status
+        if (syncStatus.isNotEmpty()) {
+            Text(
+                syncStatus,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (syncStatus.startsWith("Error") || syncStatus == "Connection failed") MaterialTheme.colorScheme.error
+                    else if (syncStatus.startsWith("Synced") || syncStatus == "Paired!") teal
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        }
+
+        if (lastSync > 0) {
+            val ago = (System.currentTimeMillis() - lastSync) / 1000
+            val agoText = when {
+                ago < 60 -> "just now"
+                ago < 3600 -> "${ago / 60} min ago"
+                ago < 86400 -> "${ago / 3600} hours ago"
+                else -> "${ago / 86400} days ago"
+            }
+            Text(
+                "Last sync: $agoText",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+        }
     }
 }
 
