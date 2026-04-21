@@ -458,8 +458,9 @@ object AiServiceSync {
     @JvmStatic
     fun checkCloudFallback(prefs: SharedPreferences) {
         if (!prefs.getBoolean(Settings.PREF_AI_CLOUD_FALLBACK, Defaults.PREF_AI_CLOUD_FALLBACK)) {
-            // Setting disabled — if fallback was active, restore originals
-            if (prefs.getBoolean(FALLBACK_ACTIVE_KEY, false)) {
+            // Setting disabled — restore originals if fallback was active or backup prefs linger
+            if (prefs.getBoolean(FALLBACK_ACTIVE_KEY, false) ||
+                MODEL_PREF_KEYS.any { prefs.contains("$BACKUP_PREFIX$it") }) {
                 deactivateCloudFallback(prefs)
             }
             return
@@ -811,6 +812,14 @@ object AiServiceSync {
             "ollama" -> {
                 val model = prefs.getString(Settings.PREF_OLLAMA_MODEL, Defaults.PREF_OLLAMA_MODEL) ?: Defaults.PREF_OLLAMA_MODEL
                 callOllama(prompt, model, prefs, cancelHandle)
+            }
+            "openai" -> {
+                val baseUrl = resolveOpenAiCompatBaseUrl(prefs)
+                if (baseUrl.isEmpty()) return "[Set your OpenAI-compatible server URL in keyboard settings]"
+                val model = aiModel.ifBlank { "default" }
+                callOpenAICompatible(prompt, model, "$baseUrl/v1/chat/completions",
+                    SecureApiKeys.getKey(Settings.PREF_OPENAI_COMPAT_API_KEY),
+                    "OpenAI-compatible", cancelHandle, requireApiKey = false, isLocal = true)
             }
             else -> callOpenAICompatible(prompt, Defaults.PREF_AI_MODEL.substringAfter(":"), "https://api.groq.com/openai/v1/chat/completions", SecureApiKeys.getKey(Settings.PREF_GROQ_API_KEY), "Groq", cancelHandle)
         }

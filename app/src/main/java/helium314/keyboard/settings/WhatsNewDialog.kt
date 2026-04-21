@@ -47,9 +47,14 @@ data class WhatsNewFeature(
     val inlineIconRes: Int? = null
 )
 
-val WHATS_NEW_VERSION = "1.3"
+val WHATS_NEW_VERSION = "1.3.1"
 
 val WHATS_NEW_FEATURES = listOf(
+    WhatsNewFeature(
+        "\uD83D\uDD27",
+        "v1.3.1 - Bug fixes",
+        "Fixed: OpenAI-compatible local servers (LM Studio, LocalAI, etc.) were incorrectly treated as cloud backends, causing 'API key not configured' errors.\n\nFixed: AI buttons blinking as unconfigured when only a local OpenAI-compatible server was set up.\n\nFixed: Default model picker in Local settings now shows both Ollama and OpenAI-compatible models.\n\nFixed: Cloud fallback cleanup when disabling the setting."
+    ),
     WhatsNewFeature(
         "\uD83C\uDFA8",
         "Tone Adjustment",

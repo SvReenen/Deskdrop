@@ -2385,6 +2385,8 @@ public final class InputLogic {
         final android.content.SharedPreferences prefs = helium314.keyboard.latin.utils.DeviceProtectedUtils.getSharedPreferences(mLatinIME);
         String ollamaUrl = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_OLLAMA_URL, "");
         if (ollamaUrl != null && !ollamaUrl.isEmpty()) return true;
+        String openaiCompatUrl = prefs.getString(helium314.keyboard.latin.settings.Settings.PREF_OPENAI_COMPAT_URL, "");
+        if (openaiCompatUrl != null && !openaiCompatUrl.isEmpty()) return true;
         return false;
     }
 
@@ -2400,8 +2402,9 @@ public final class InputLogic {
                 return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_OPENROUTER_API_KEY).isEmpty();
             case "anthropic":
                 return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_ANTHROPIC_API_KEY).isEmpty();
-            case "openai":
+            case "openai-cloud":
                 return !helium314.keyboard.latin.ai.SecureApiKeys.getKey(helium314.keyboard.latin.settings.Settings.PREF_OPENAI_API_KEY).isEmpty();
+            case "openai":
             case "ollama":
             case "onnx":
             case "openai_compat":

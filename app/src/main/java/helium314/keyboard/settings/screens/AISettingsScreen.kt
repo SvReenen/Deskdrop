@@ -1190,7 +1190,14 @@ private fun LocalTab(
             }
         }
 
-        // Default model picker
+        // Default model picker (Ollama + OpenAI-compatible combined)
+        val allLocalModelItems = remember(localModelItems, openaiCompatModelItems, currentModel) {
+            val combined = mutableListOf<Pair<String, String>>()
+            combined.addAll(localModelItems)
+            combined.addAll(openaiCompatModelItems)
+            combined.toList()
+        }
+        val isLocalOrOpenAi = currentModel.startsWith("ollama:") || currentModel.startsWith("openai:")
         var showModelDialog by remember { mutableStateOf(false) }
         BrandCard {
             Column {
@@ -1200,9 +1207,11 @@ private fun LocalTab(
                     color = teal,
                     fontWeight = FontWeight.Bold
                 )
-                val selectedLocal = localModelItems.firstOrNull { it.second == currentModel }
+                val selectedLocal = allLocalModelItems.firstOrNull { it.second == currentModel }
                 Text(
-                    if (isLocal) (selectedLocal?.first ?: currentModel.substringAfter("ollama:")) else "(select a local model)",
+                    if (isLocalOrOpenAi && selectedLocal != null) selectedLocal.first
+                    else if (isLocalOrOpenAi) currentModel.substringAfter(":")
+                    else "(select a local model)",
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1219,11 +1228,11 @@ private fun LocalTab(
         if (showModelDialog) {
             helium314.keyboard.settings.dialogs.ListPickerDialog(
                 onDismissRequest = { showModelDialog = false },
-                items = localModelItems,
+                items = allLocalModelItems,
                 onItemSelected = {
                     prefs.edit { putString(Settings.PREF_AI_MODEL, it.second) }
                 },
-                selectedItem = localModelItems.firstOrNull { it.second == currentModel },
+                selectedItem = allLocalModelItems.firstOrNull { it.second == currentModel },
                 title = { Text("Default model") },
                 getItemName = { it.first }
             )
@@ -1657,7 +1666,7 @@ private fun CloudTab(
 ) {
     val teal = brandTeal()
     val currentModel = prefs.getString(Settings.PREF_AI_MODEL, Defaults.PREF_AI_MODEL) ?: Defaults.PREF_AI_MODEL
-    val isCloud = !currentModel.startsWith("ollama:") && !currentModel.startsWith("onnx:")
+    val isCloud = !currentModel.startsWith("ollama:") && !currentModel.startsWith("onnx:") && !currentModel.startsWith("openai:")
 
     val ctx = LocalContext.current
     var cloudAdvancedExpanded by rememberSaveable { mutableStateOf(false) }
