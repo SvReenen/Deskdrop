@@ -9,9 +9,13 @@ Deskdrop is an Android keyboard with AI built in. Use Ollama, any OpenAI-compati
 
 ## Demo
 
-**AI Assist** - Rewrite selected text with one tap
+**AI Toner** - Rewrite selected text with one tap. All buttons are fully configurable in settings.
 
-https://github.com/user-attachments/assets/f9835142-7861-4093-a49f-de66a2b9e0d9
+https://github.com/user-attachments/assets/635d2ac9-3637-4e7c-8e4c-513b09e0f57f
+
+**Clipboard AI** - Process clipboard content through AI
+
+https://github.com/user-attachments/assets/3f13accb-59d9-4568-9e50-cf3405665bd4
 
 <details>
 <summary>More demos</summary>
@@ -19,10 +23,6 @@ https://github.com/user-attachments/assets/f9835142-7861-4093-a49f-de66a2b9e0d9
 **Inline // syntax** - Type instructions directly after your text
 
 https://github.com/user-attachments/assets/9aed41b8-5524-41ef-9fa7-33618d7fcd84
-
-**Clipboard AI** - Process clipboard content through AI
-
-https://github.com/user-attachments/assets/d5d21435-00a3-4295-9f19-fccafa5bade4
 
 **Conversation + Tools** - Ask about the weather, it calls the tool automatically
 
@@ -48,30 +48,24 @@ https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
 
 ## Features
 
-**Local AI integration**
-- Ollama, LM Studio, vLLM, llama.cpp, KoboldCpp, Jan, Msty, or any OpenAI-compatible server
-- Primary + LAN fallback URL for seamless connectivity
-- On-device ONNX inference (T5) for fully offline use
-- Ollama Model Wizard: create custom models with tailored system prompts
-
-**Cloud providers**
-- Gemini, Groq, OpenRouter, Anthropic, OpenAI
-- Cloud fallback: when your local server goes down, all shortcuts automatically switch to a cloud model and revert when it's back (red dot indicator on toolbar keys)
-
-**AI shortcuts**
-- AI Assist: rewrite, translate, or transform selected text with a single tap
-- AI Tone: one-tap tone adjustment (Formal, Casual, Friendly, Shorter, Longer, Grammar, Dutch, English) with customizable chips
-- AI Preview Panel: see results before applying, with retry, copy, and dismiss options
-- 4 configurable shortcut slots, each with its own model and instruction
-- Inline commands with `//` syntax (e.g. `//formal`, `//grammar`, `//shorten`) with command chaining
+**AI in every text field**
+- Rewrite, translate, summarize, or adjust tone without leaving the app you're in
+- Inline `//` commands with chaining (e.g. `//formal`, `//grammar`, `//shorten`)
+- Configurable toolbar shortcuts with per-slot model and instruction
 - Clipboard context: copy a message, type your reply, AI uses the context automatically
-- AI Clipboard: process clipboard content through AI
+- Preview panel: see results before applying, with retry, copy, and dismiss
 - Undo: tap again after AI processing to restore original text
 
+**Your backend, your choice**
+- Ollama, LM Studio, vLLM, llama.cpp, KoboldCpp, or any OpenAI-compatible server
+- Cloud providers optional (Groq, Gemini, OpenRouter, Anthropic, OpenAI)
+- Primary + fallback URL for LAN/Tailscale setups
+- Cloud fallback: when your local server goes down, shortcuts automatically switch to a cloud model and revert when it's back
+- On-device ONNX inference (T5) for fully offline use
+
 **Voice**
-- Self-hosted Whisper transcription (via Speaches or any Whisper-compatible server)
-- Google Speech Recognition as alternative engine
-- Configurable voice modes with custom prompts
+- Google Speech Recognition or self-hosted Whisper
+- Custom voice modes and prompts
 - Supports `{voice_input}` and `{clipboard}` placeholders
 
 **Conversation**
@@ -79,7 +73,14 @@ https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
 - Model picker per conversation
 - Reminder system with notifications that reopen the exact conversation
 
-**17 built-in AI tools**
+**Tools and automation**
+- 17 built-in AI tools (weather, calendar, navigation, SMS, contacts, and more)
+- MCP support for Home Assistant and custom tool servers
+- Streamable HTTP and Legacy SSE transport
+- Per-server bearer token authentication
+
+<details>
+<summary>All 17 built-in tools</summary>
 
 | Tool | What it does |
 |---|---|
@@ -101,10 +102,7 @@ https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
 | `send_sms` | Open SMS app with message |
 | `contact_lookup` | Search contacts by name |
 
-**MCP (Model Context Protocol)**
-- Connect external tool servers (Home Assistant, filesystem, custom APIs)
-- Streamable HTTP and Legacy SSE transport
-- Per-server bearer token authentication
+</details>
 
 **Home screen widget**
 - Quick access bar with Voice, Chat, and Execute buttons
@@ -113,14 +111,15 @@ https://github.com/user-attachments/assets/5d807877-a171-4389-a132-8fe65f53ee20
 
 Install the APK, open Deskdrop, and the setup wizard walks you through everything.
 
-### Quick Start (no setup needed)
+### Quick Start
 
 1. Install the APK and open Deskdrop
 2. Tap **Try it now**
 3. Choose **Quick Start**
 4. Turn on Deskdrop in your keyboard settings
 5. Switch to Deskdrop as your active keyboard
-6. Done. You can start using AI right away
+6. Get a free API key from [Groq](https://console.groq.com/keys) and paste it ([watch guide](docs/groq-guide.mp4))
+7. Done. You can start using AI right away
 
 ### Advanced Setup
 
@@ -129,23 +128,30 @@ Choose **Advanced Setup** if you want to connect your own models or use a specif
 **Cloud path (Groq / Gemini)**
 
 1. Choose **Cloud** on the setup screen
-2. Get a free API key from Groq or Gemini
+2. Get a free API key from Groq or Gemini ([watch guide](docs/groq-guide.mp4))
 3. Paste your key and continue
 4. The AI demo lets you test your connection before finishing
-
-[Watch the Groq setup guide (1 min)](https://github.com/SvReenen/Deskdrop/releases/download/v1.2.0/groq-guide.mp4)
 
 **Local path (Ollama)**
 
 1. Make sure Ollama is running on your computer
-2. Choose **Local** on the setup screen
-3. Enter your Ollama URL (default: `http://localhost:11434`)
-4. Tap **Test connection** to verify
-5. Pick a model from the list
-6. Optional: set an alternate connection for Tailscale or LAN access
-7. The AI demo lets you test your setup before finishing
+2. Set Ollama to accept connections from your phone:
+   - Windows: set environment variables `OLLAMA_HOST=0.0.0.0:11434` and `OLLAMA_ORIGINS=*` (System Properties > Environment Variables), then restart Ollama
+   - Mac/Linux: `OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve`
 
-Both paths include an optional personalization step where you can tell the AI about your writing style and language preferences. This helps AI responses sound more like you.
+   <details>
+   <summary>Click here to see where to set this on Windows</summary>
+
+   ![Ollama environment variables](docs/ollama-env-variables.png)
+
+   </details>
+3. Choose **Local** on the setup screen
+4. Enter your computer's IP address (e.g. `http://192.168.1.100:11434`)
+5. Tap **Test connection** to verify
+6. Pick a model from the list
+7. Optional: set an alternate connection for Tailscale or LAN access
+8. The AI demo lets you test your setup before finishing
+
 
 ## Supported backends
 
