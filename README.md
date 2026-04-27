@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Android 9.0+](https://img.shields.io/badge/Android-9.0%2B-brightgreen.svg)]()
 [![Release](https://img.shields.io/github/v/release/SvReenen/Deskdrop?color=orange&label=Release)](https://github.com/SvReenen/Deskdrop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/SvReenen/Deskdrop/total?color=blue)](https://github.com/SvReenen/Deskdrop/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/SvReenen/Deskdrop/total?color=blue&v=2)](https://github.com/SvReenen/Deskdrop/releases/latest)
 
 Deskdrop is an Android keyboard with AI built in. Use Ollama, any OpenAI-compatible server, or a cloud API key. Built on HeliBoard.
 
